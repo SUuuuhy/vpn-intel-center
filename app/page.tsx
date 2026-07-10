@@ -1,5 +1,6 @@
 "use client";
 
+import intelligenceData from "@/data/intelligence.json";
 import { type ReactNode, useMemo, useState } from "react";
 
 type Trend = "新出现" | "升温" | "稳定" | "降温" | "样本不足";
@@ -60,6 +61,42 @@ type Opportunity = {
   nextStep: string;
   owner: string;
 };
+
+type SourceStat = {
+  name: string;
+  total: number;
+  active: number;
+  freq: string;
+  color: string;
+};
+
+type ThemeRelation = {
+  leftThemeId: string;
+  rightThemeId: string;
+  level: string;
+  reason: string;
+};
+
+type IntelligenceData = {
+  generatedAt: string;
+  displayDate: string;
+  status: {
+    newItemsToday: number;
+    highPriorityToday: number;
+    pendingReview: number;
+    normalSourceRate: number;
+    sourcesWaitingReview: number;
+    manualCorrections: number;
+  };
+  sourceStats: SourceStat[];
+  briefingItems: BriefingItem[];
+  themes: Theme[];
+  evidence: Evidence[];
+  themeRelations: ThemeRelation[];
+  opportunities: Opportunity[];
+};
+
+const intelligence = intelligenceData as IntelligenceData;
 
 const sourceStats = [
   { name: "竞品情报", total: 116, active: 101, freq: "按页/账号分频", color: "bg-teal-500" },
@@ -381,17 +418,30 @@ export default function Home() {
   const [selectedThemeId, setSelectedThemeId] = useState("d1");
 
   const visibleBriefing = useMemo(
-    () => briefingItems.filter((item) => item.period === briefingPeriod && item.priority === "高"),
+    () => intelligence.briefingItems.filter((item) => item.period === briefingPeriod && item.priority === "高"),
     [briefingPeriod],
   );
 
   const visibleThemes = useMemo(
-    () => themes.filter((theme) => themeFilter === "全部" || theme.type === themeFilter),
+    () => intelligence.themes.filter((theme) => themeFilter === "全部" || theme.type === themeFilter),
     [themeFilter],
   );
 
-  const selectedTheme = themes.find((theme) => theme.id === selectedThemeId) ?? themes[0];
-  const selectedEvidence = evidence.filter((item) => item.themeId === selectedTheme.id);
+  const selectedTheme = intelligence.themes.find((theme) => theme.id === selectedThemeId) ?? intelligence.themes[0];
+  const selectedEvidence = intelligence.evidence.filter((item) => item.themeId === selectedTheme.id);
+  const coreEvidenceCount = intelligence.evidence.filter((item) => item.role === "核心证据").length;
+  const referenceEvidenceCount = intelligence.evidence.length - coreEvidenceCount;
+  const highThemeCount = intelligence.themes.filter((theme) => theme.priority === "高").length;
+  const validatingOpportunityCount = intelligence.opportunities.filter((opportunity) => opportunity.status === "验证中").length;
+  const waitingOpportunityCount = intelligence.opportunities.filter((opportunity) => opportunity.status === "待评估").length;
+  const totalSourceCount = intelligence.sourceStats.reduce((sum, source) => sum + source.total, 0);
+  const activeSourceCount = intelligence.sourceStats.reduce((sum, source) => sum + source.active, 0);
+  const lastUpdatedTime = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(intelligence.generatedAt));
 
   return (
     <main className="min-h-screen bg-[#f6f7f4] text-zinc-950">
@@ -400,11 +450,11 @@ export default function Home() {
           <div>
             <p className="text-sm font-semibold text-teal-700">VPN 市场增长信息中心</p>
             <h1 className="mt-1 text-3xl font-semibold tracking-normal text-zinc-950">
-              2026-07-10 情报简报
+              {intelligence.displayDate} 情报简报
             </h1>
           </div>
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-            {sourceStats.map((source) => (
+            {intelligence.sourceStats.map((source) => (
               <div key={source.name} className="min-w-24 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
                 <div className={`mb-2 h-1.5 rounded-full ${source.color}`} />
                 <p className="text-xs font-medium text-zinc-500">{source.name}</p>
@@ -439,19 +489,19 @@ export default function Home() {
               <div>
                 <div className="flex items-center justify-between text-xs text-zinc-500">
                   <span>今日正常信源</span>
-                  <span>92%</span>
+                  <span>{intelligence.status.normalSourceRate}%</span>
                 </div>
                 <div className="mt-1 h-2 rounded-full bg-zinc-100">
-                  <div className="h-2 rounded-full bg-emerald-500" style={{ width: "92%" }} />
+                  <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${intelligence.status.normalSourceRate}%` }} />
                 </div>
               </div>
               <div>
                 <div className="flex items-center justify-between text-xs text-zinc-500">
                   <span>待人工确认</span>
-                  <span>17</span>
+                  <span>{intelligence.status.sourcesWaitingReview}</span>
                 </div>
                 <div className="mt-1 h-2 rounded-full bg-zinc-100">
-                  <div className="h-2 rounded-full bg-amber-500" style={{ width: "28%" }} />
+                  <div className="h-2 rounded-full bg-amber-500" style={{ width: `${Math.min(100, intelligence.status.sourcesWaitingReview * 2)}%` }} />
                 </div>
               </div>
             </div>
@@ -465,7 +515,9 @@ export default function Home() {
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 className="text-xl font-semibold">高优先级简报</h2>
-                    <p className="mt-1 text-sm text-zinc-500">今日新增 19 · 高优先级 3 · 待确认 4</p>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      今日新增 {intelligence.status.newItemsToday} · 高优先级 {intelligence.status.highPriorityToday} · 待确认 {intelligence.status.pendingReview}
+                    </p>
                   </div>
                   <div className="grid grid-cols-2 rounded-md border border-zinc-200 bg-zinc-50 p-1">
                     {[
@@ -515,15 +567,11 @@ export default function Home() {
                 <div className="rounded-md border border-zinc-200 bg-white p-5 xl:col-span-2">
                   <h2 className="text-xl font-semibold">需求 × 竞品关联</h2>
                   <div className="mt-5 grid gap-3">
-                    {[
-                      ["d1", "a1", "强关联", "共同平台 BBC iPlayer，时间窗口 24 小时内重叠"],
-                      ["d2", "a3", "中关联", "共同流媒体场景，但目标市场仍需确认"],
-                      ["d1", "a2", "弱关联", "同为流媒体增长场景，平台不同"],
-                    ].map(([left, right, level, reason]) => {
-                      const leftTheme = themes.find((theme) => theme.id === left);
-                      const rightTheme = themes.find((theme) => theme.id === right);
+                    {intelligence.themeRelations.map(({ leftThemeId, rightThemeId, level, reason }) => {
+                      const leftTheme = intelligence.themes.find((theme) => theme.id === leftThemeId);
+                      const rightTheme = intelligence.themes.find((theme) => theme.id === rightThemeId);
                       return (
-                        <div key={`${left}-${right}`} className="grid gap-3 rounded-md border border-zinc-200 p-4 md:grid-cols-[1fr_auto_1fr] md:items-center">
+                        <div key={`${leftThemeId}-${rightThemeId}`} className="grid gap-3 rounded-md border border-zinc-200 p-4 md:grid-cols-[1fr_auto_1fr] md:items-center">
                           <p className="text-sm font-semibold">{leftTheme?.title}</p>
                           <div className="text-center text-xs font-semibold text-teal-700">
                             {level}
@@ -541,7 +589,7 @@ export default function Home() {
                 <div className="rounded-md border border-zinc-200 bg-white p-5">
                   <h2 className="text-xl font-semibold">本周机会入口</h2>
                   <div className="mt-5 grid gap-4">
-                    {opportunities.map((opportunity) => (
+                    {intelligence.opportunities.map((opportunity) => (
                       <div key={opportunity.id} className="border-b border-zinc-100 pb-4 last:border-0 last:pb-0">
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-sm font-semibold">{opportunity.title}</p>
@@ -562,7 +610,9 @@ export default function Home() {
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 className="text-xl font-semibold">全部主题库</h2>
-                    <p className="mt-1 text-sm text-zinc-500">主题 6 · 高优先级 4 · 人工修正 2</p>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      主题 {intelligence.themes.length} · 高优先级 {highThemeCount} · 人工修正 {intelligence.status.manualCorrections}
+                    </p>
                   </div>
                   <div className="grid grid-cols-3 rounded-md border border-zinc-200 bg-zinc-50 p-1">
                     {["全部", "需求型", "动作型"].map((filter) => (
@@ -664,9 +714,9 @@ export default function Home() {
           {activeView === "证据库" && (
             <section className="rounded-md border border-zinc-200 bg-white p-5">
               <h2 className="text-xl font-semibold">证据库</h2>
-              <p className="mt-1 text-sm text-zinc-500">核心证据 4 · 参考信息 1 · 最近更新 09:20</p>
+              <p className="mt-1 text-sm text-zinc-500">核心证据 {coreEvidenceCount} · 参考信息 {referenceEvidenceCount} · 最近更新 {lastUpdatedTime}</p>
               <div className="mt-5 grid gap-3">
-                {evidence.map((item) => (
+                {intelligence.evidence.map((item) => (
                   <article key={item.id} className="rounded-md border border-zinc-200 p-4">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
@@ -693,9 +743,9 @@ export default function Home() {
           {activeView === "机会池" && (
             <section className="rounded-md border border-zinc-200 bg-white p-5">
               <h2 className="text-xl font-semibold">增长机会池</h2>
-              <p className="mt-1 text-sm text-zinc-500">机会 3 · 验证中 1 · 待评估 2</p>
+              <p className="mt-1 text-sm text-zinc-500">机会 {intelligence.opportunities.length} · 验证中 {validatingOpportunityCount} · 待评估 {waitingOpportunityCount}</p>
               <div className="mt-5 grid gap-4">
-                {opportunities.map((opportunity) => (
+                {intelligence.opportunities.map((opportunity) => (
                   <article key={opportunity.id} className="rounded-md border border-zinc-200 p-4">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div className="min-w-0">
@@ -728,9 +778,9 @@ export default function Home() {
           {activeView === "信源状态" && (
             <section className="rounded-md border border-zinc-200 bg-white p-5">
               <h2 className="text-xl font-semibold">信源状态</h2>
-              <p className="mt-1 text-sm text-zinc-500">信源 472 · 启用 400 · 今日正常 92%</p>
+              <p className="mt-1 text-sm text-zinc-500">信源 {totalSourceCount} · 启用 {activeSourceCount} · 今日正常 {intelligence.status.normalSourceRate}%</p>
               <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {sourceStats.map((source) => (
+                {intelligence.sourceStats.map((source) => (
                   <article key={source.name} className="rounded-md border border-zinc-200 p-4">
                     <div className={`h-2 rounded-full ${source.color}`} />
                     <div className="mt-4 flex items-start justify-between gap-3">

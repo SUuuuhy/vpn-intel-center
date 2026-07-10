@@ -1,0 +1,42 @@
+{
+  "timezone": "Asia/Shanghai",
+  "marketFocus": ["US", "UK", "DE", "CA", "AU", "EU"],
+  "keywords": {
+    "competitors": ["NordVPN", "ExpressVPN", "Surfshark", "Proton VPN", "CyberGhost", "PIA VPN"],
+    "demand": ["blocked", "restriction", "geo-restricted", "unblock", "access", "streaming", "privacy", "age verification", "payment region"],
+    "platforms": ["Netflix", "BBC iPlayer", "Hulu", "Disney+", "YouTube", "ESPN", "iTunes"],
+    "vpn": ["VPN", "virtual private network"]
+  },
+  "sources": [
+    {
+      "id": "news-competitors",
+      "name": "Google News - VPN Competitors",
+      "category": "竞品情报",
+      "secondaryCategory": "竞品词新闻",
+      "market": "US",
+      "url": "https://news.google.com/rss/search?q=NordVPN%20OR%20ExpressVPN%20OR%20Surfshark%20VPN&hl=en-US&gl=US&ceid=US:en",
+      "mode": "rss",
+      "frequency": "daily"
+    },
+    {
+      "id": "news-user-demand",
+      "name": "Google News - VPN Demand Scenes",
+      "category": "用户声音",
+      "secondaryCategory": "需求场景新闻",
+      "market": "US",
+      "url": "https://news.google.com/rss/search?q=VPN%20Netflix%20OR%20BBC%20iPlayer%20OR%20geo-restricted&hl=en-US&gl=US&ceid=US:en",
+      "mode": "rss",
+      "frequency": "daily"
+    },
+    {
+      "id": "news-policy",
+      "name": "Google News - VPN Policy",
+      "category": "政策监管",
+      "secondaryCategory": "政策与监管新闻",
+      "market": "EU",
+      "url": "https://news.google.com/rss/search?q=VPN%20privacy%20law%20OR%20age%20verification&hl=en-US&gl=US&ceid=US:en",
+      "mode": "rss",
+      "frequency": "daily"
+    }
+  ]
+}

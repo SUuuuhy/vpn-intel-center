@@ -1,97 +1,47 @@
-# vinext-starter
+# VPN 市场增长信息中心
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+这是一个面向 VPN 产品增长和运营团队的情报看板，支持 GitHub Pages 静态展示和 GitHub Actions 每日自动更新。
 
-## Prerequisites
+## 功能
 
-- Node.js `>=22.13.0`
+- 每日/每周高优先级情报简报
+- 需求型主题与竞品动作主题
+- 核心证据和参考信息分层
+- 增长机会池与可行性建议
+- 6 类信源状态追踪
 
-## Quick Start
+## 数据结构
+
+- `data/intelligence.json`: 看板实际读取的数据
+- `data/source-rules.json`: 自动更新使用的信源和关键词规则
+- `scripts/update_daily.mjs`: 每日抓取、轻量分类、写回数据的脚本
+
+## GitHub Pages 自动更新
+
+`.github/workflows/update-and-deploy.yml` 会在每天北京时间 07:10 自动执行：
+
+1. 安装依赖
+2. 运行 `npm run update:daily`
+3. 提交更新后的 `data/intelligence.json`
+4. 构建 GitHub Pages 静态站点
+5. 发布到 GitHub Pages
+
+在 GitHub 仓库中启用方式：
+
+1. 打开 `Settings > Pages`
+2. 将 `Build and deployment` 的 `Source` 设为 `GitHub Actions`
+3. 到 `Actions` 手动运行一次 `Update and deploy intelligence center`
+
+## 本地命令
 
 ```bash
 npm install
-npm run dev
-npm run build
+npm run update:daily
+npm run build:pages
 ```
 
-This starter does not use `wrangler.jsonc`.
+本地只检查更新脚本但不写入数据：
 
-## Included Shape
-
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```bash
+node scripts/update_daily.mjs --dry-run
 ```
-
-## Optional Dispatch-Owned ChatGPT Sign-In
-
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
-
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
-
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
-
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
-
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
-
-## Useful Commands
-
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm run db:generate`: generate Drizzle migrations after schema changes
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
