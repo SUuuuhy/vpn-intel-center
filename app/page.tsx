@@ -1,7 +1,7 @@
 "use client";
 
 import intelligenceData from "@/data/intelligence.json";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 type Trend = "新出现" | "升温" | "稳定" | "降温" | "样本不足";
 type Priority = "高" | "中" | "低";
@@ -18,6 +18,7 @@ type BriefingItem = {
   evidence: number;
   source: string;
   time: string;
+  url?: string;
 };
 
 type Theme = {
@@ -47,6 +48,7 @@ type Evidence = {
   source: string;
   summary: string;
   time: string;
+  url?: string;
 };
 
 type Opportunity = {
@@ -77,6 +79,22 @@ type ThemeRelation = {
   reason: string;
 };
 
+type ManualReview = {
+  themeId: string;
+  priority: Priority;
+  rating: Priority;
+  demandStrength: Priority;
+  competitorResponse: Priority;
+  actionability: Priority;
+  risk: Priority;
+  relationDecision: "已确认" | "待确认" | "不关联";
+  opportunityDecision: "进入机会池" | "继续观察" | "暂不处理";
+  actions: string[];
+  note: string;
+};
+
+type ManualReviewState = Record<string, ManualReview>;
+
 type IntelligenceData = {
   generatedAt: string;
   displayDate: string;
@@ -94,6 +112,7 @@ type IntelligenceData = {
   evidence: Evidence[];
   themeRelations: ThemeRelation[];
   opportunities: Opportunity[];
+  manualReviews?: ManualReview[];
 };
 
 const intelligence = intelligenceData as IntelligenceData;
@@ -393,6 +412,8 @@ const priorityStyles: Record<Priority, string> = {
   "低": "bg-zinc-200 text-zinc-700",
 };
 
+const actionOptions = ["产品能力验证", "SEO页面", "内容选题", "落地页优化", "广告投放", "价格/活动策略", "合作渠道", "客服/运营响应"];
+
 function Badge({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <span className={`inline-flex h-7 items-center rounded-full border px-3 text-xs font-semibold ${className}`}>
@@ -411,11 +432,73 @@ function MiniBars({ current, previous }: { current: number; previous: number }) 
   );
 }
 
+function createDefaultReview(theme: Theme): ManualReview {
+  return {
+    themeId: theme.id,
+    priority: theme.priority,
+    rating: theme.priority,
+    demandStrength: theme.type === "需求型" ? theme.priority : "中",
+    competitorResponse: theme.type === "动作型" ? theme.priority : "中",
+    actionability: theme.priority === "高" ? "高" : "中",
+    risk: theme.trend === "样本不足" ? "高" : "中",
+    relationDecision: "待确认",
+    opportunityDecision: theme.priority === "高" ? "进入机会池" : "继续观察",
+    actions: theme.type === "需求型" ? ["产品能力验证", "SEO页面"] : ["内容选题"],
+    note: "",
+  };
+}
+
+function SegmentedButtons<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: T[];
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div className="grid grid-cols-3 rounded-md border border-zinc-200 bg-zinc-50 p-1">
+      {options.map((option) => (
+        <button
+          key={option}
+          onClick={() => onChange(option)}
+          className={`h-9 rounded px-2 text-sm font-semibold ${
+            value === option ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-500 hover:text-zinc-950"
+          }`}
+        >
+          {option}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function Home() {
   const [briefingPeriod, setBriefingPeriod] = useState<"daily" | "weekly">("daily");
   const [activeView, setActiveView] = useState("简报");
   const [themeFilter, setThemeFilter] = useState<"全部" | ThemeType>("全部");
   const [selectedThemeId, setSelectedThemeId] = useState("d1");
+  const [manualReviewsReady, setManualReviewsReady] = useState(false);
+  const [manualReviews, setManualReviews] = useState<ManualReviewState>({});
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      setManualReviewsReady(true);
+      return;
+    }
+    try {
+      setManualReviews(JSON.parse(window.localStorage.getItem("vpn-intel-manual-reviews") ?? "{}") as ManualReviewState);
+    } catch {
+      setManualReviews({});
+    }
+    setManualReviewsReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!manualReviewsReady) return;
+    window.localStorage.setItem("vpn-intel-manual-reviews", JSON.stringify(manualReviews));
+  }, [manualReviews, manualReviewsReady]);
 
   const visibleBriefing = useMemo(
     () => intelligence.briefingItems.filter((item) => item.period === briefingPeriod && item.priority === "高"),
@@ -429,9 +512,26 @@ export default function Home() {
 
   const selectedTheme = intelligence.themes.find((theme) => theme.id === selectedThemeId) ?? intelligence.themes[0];
   const selectedEvidence = intelligence.evidence.filter((item) => item.themeId === selectedTheme.id);
+  const selectedRelations = intelligence.themeRelations.filter(
+    (relation) => relation.leftThemeId === selectedTheme.id || relation.rightThemeId === selectedTheme.id,
+  );
+  const selectedOpportunities = intelligence.opportunities.filter((opportunity) => opportunity.themeId === selectedTheme.id);
+  const sourceUrlByTitle = useMemo(
+    () => new Map(intelligence.evidence.filter((item) => item.url).map((item) => [item.title, item.url])),
+    [],
+  );
+  const selectedManualReview = {
+    ...createDefaultReview(selectedTheme),
+    ...(intelligence.manualReviews?.find((review) => review.themeId === selectedTheme.id) ?? {}),
+    ...(manualReviews[selectedTheme.id] ?? {}),
+  };
   const coreEvidenceCount = intelligence.evidence.filter((item) => item.role === "核心证据").length;
   const referenceEvidenceCount = intelligence.evidence.length - coreEvidenceCount;
   const highThemeCount = intelligence.themes.filter((theme) => theme.priority === "高").length;
+  const manualReviewCount = new Set([
+    ...Object.keys(manualReviews),
+    ...(intelligence.manualReviews?.map((review) => review.themeId) ?? []),
+  ]).size;
   const validatingOpportunityCount = intelligence.opportunities.filter((opportunity) => opportunity.status === "验证中").length;
   const waitingOpportunityCount = intelligence.opportunities.filter((opportunity) => opportunity.status === "待评估").length;
   const totalSourceCount = intelligence.sourceStats.reduce((sum, source) => sum + source.total, 0);
@@ -442,6 +542,26 @@ export default function Home() {
     minute: "2-digit",
     hour12: false,
   }).format(new Date(intelligence.generatedAt));
+
+  function updateManualReview(patch: Partial<ManualReview>) {
+    setManualReviews((current) => ({
+      ...current,
+      [selectedTheme.id]: {
+        ...createDefaultReview(selectedTheme),
+        ...(current[selectedTheme.id] ?? {}),
+        ...patch,
+      },
+    }));
+  }
+
+  function toggleManualAction(action: string) {
+    const currentActions = selectedManualReview.actions;
+    updateManualReview({
+      actions: currentActions.includes(action)
+        ? currentActions.filter((item) => item !== action)
+        : [...currentActions, action],
+    });
+  }
 
   return (
     <main className="min-h-screen bg-[#f6f7f4] text-zinc-950">
@@ -538,28 +658,41 @@ export default function Home() {
                 </div>
 
                 <div className="mt-5 grid gap-3">
-                  {visibleBriefing.map((item) => (
-                    <article key={item.id} className="rounded-md border border-zinc-200 p-4">
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap gap-2">
-                            <Badge className="border-zinc-200 bg-zinc-50 text-zinc-700">{item.type}</Badge>
-                            <Badge className={trendStyles[item.trend]}>{item.trend}</Badge>
-                            <span className={`inline-flex h-7 items-center rounded-full px-3 text-xs font-semibold ${priorityStyles[item.priority]}`}>
-                              {item.priority}优先级
-                            </span>
+                  {visibleBriefing.map((item) => {
+                    const itemUrl = item.url ?? sourceUrlByTitle.get(item.title);
+                    return (
+                      <article key={item.id} className="rounded-md border border-zinc-200 p-4">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap gap-2">
+                              <Badge className="border-zinc-200 bg-zinc-50 text-zinc-700">{item.type}</Badge>
+                              <Badge className={trendStyles[item.trend]}>{item.trend}</Badge>
+                              <span className={`inline-flex h-7 items-center rounded-full px-3 text-xs font-semibold ${priorityStyles[item.priority]}`}>
+                                {item.priority}优先级
+                              </span>
+                            </div>
+                            <h3 className="mt-3 break-words text-lg font-semibold">{item.title}</h3>
+                            <p className="mt-2 max-w-3xl break-words text-sm leading-6 text-zinc-600">{item.summary}</p>
+                            {itemUrl && (
+                              <a
+                                href={itemUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-3 inline-flex text-sm font-semibold text-teal-700 hover:text-teal-900"
+                              >
+                                查看来源
+                              </a>
+                            )}
                           </div>
-                          <h3 className="mt-3 text-lg font-semibold">{item.title}</h3>
-                          <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-600">{item.summary}</p>
+                          <div className="grid min-w-36 gap-1 text-sm text-zinc-500">
+                            <span>{item.source}</span>
+                            <span>{item.evidence} 条核心证据</span>
+                            <span>{item.time}</span>
+                          </div>
                         </div>
-                        <div className="grid min-w-36 gap-1 text-sm text-zinc-500">
-                          <span>{item.source}</span>
-                          <span>{item.evidence} 条核心证据</span>
-                          <span>{item.time}</span>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
+                      </article>
+                    );
+                  })}
                 </div>
               </section>
 
@@ -611,7 +744,7 @@ export default function Home() {
                   <div>
                     <h2 className="text-xl font-semibold">全部主题库</h2>
                     <p className="mt-1 text-sm text-zinc-500">
-                      主题 {intelligence.themes.length} · 高优先级 {highThemeCount} · 人工修正 {intelligence.status.manualCorrections}
+                      主题 {intelligence.themes.length} · 高优先级 {highThemeCount} · 人工修正 {manualReviewCount}
                     </p>
                   </div>
                   <div className="grid grid-cols-3 rounded-md border border-zinc-200 bg-zinc-50 p-1">
@@ -637,29 +770,72 @@ export default function Home() {
                     <span>趋势</span>
                     <span>证据</span>
                   </div>
-                  {visibleThemes.map((theme) => (
-                    <button
-                      key={theme.id}
-                      onClick={() => setSelectedThemeId(theme.id)}
-                      className={`grid min-w-[820px] w-full grid-cols-[1.7fr_0.7fr_0.8fr_0.7fr_0.7fr] items-center gap-3 border-t border-zinc-200 px-4 py-4 text-left transition hover:bg-zinc-50 ${
-                        selectedTheme.id === theme.id ? "bg-teal-50/60" : "bg-white"
-                      }`}
-                    >
-                      <span>
-                        <span className="block text-sm font-semibold">{theme.title}</span>
-                        <span className="mt-1 block text-xs text-zinc-500">{theme.type} · {theme.summary}</span>
-                      </span>
-                      <span className="text-sm text-zinc-600">{theme.market}</span>
-                      <span className="text-sm text-zinc-600">{theme.type === "需求型" ? theme.platform : theme.competitor}</span>
-                      <span>
-                        <Badge className={trendStyles[theme.trend]}>{theme.trend}</Badge>
-                      </span>
-                      <span className="flex items-center gap-3">
-                        <MiniBars current={theme.currentEvidence} previous={theme.previousEvidence} />
-                        <span className="text-xs text-zinc-500">{theme.currentEvidence}/{theme.previousEvidence}</span>
-                      </span>
-                    </button>
-                  ))}
+                  {visibleThemes.map((theme) => {
+                    const themeEvidence = intelligence.evidence.filter((item) => item.themeId === theme.id);
+                    const themeRelations = intelligence.themeRelations.filter(
+                      (relation) => relation.leftThemeId === theme.id || relation.rightThemeId === theme.id,
+                    );
+                    const themeOpportunity = intelligence.opportunities.find((opportunity) => opportunity.themeId === theme.id);
+                    const isSelected = selectedTheme.id === theme.id;
+                    return (
+                      <div key={theme.id} className="min-w-[820px] border-t border-zinc-200">
+                        <button
+                          onClick={() => setSelectedThemeId(theme.id)}
+                          className={`grid w-full grid-cols-[1.7fr_0.7fr_0.8fr_0.7fr_0.7fr] items-center gap-3 px-4 py-4 text-left transition hover:bg-zinc-50 ${
+                            isSelected ? "bg-teal-50/60" : "bg-white"
+                          }`}
+                        >
+                          <span>
+                            <span className="block break-words text-sm font-semibold">{theme.title}</span>
+                            <span className="mt-1 block break-words text-xs text-zinc-500">{theme.type} · {theme.summary}</span>
+                          </span>
+                          <span className="text-sm text-zinc-600">{theme.market}</span>
+                          <span className="text-sm text-zinc-600">{theme.type === "需求型" ? theme.platform : theme.competitor}</span>
+                          <span>
+                            <Badge className={trendStyles[theme.trend]}>{theme.trend}</Badge>
+                          </span>
+                          <span className="flex items-center gap-3">
+                            <MiniBars current={theme.currentEvidence} previous={theme.previousEvidence} />
+                            <span className="text-xs text-zinc-500">{theme.currentEvidence}/{theme.previousEvidence}</span>
+                          </span>
+                        </button>
+                        {isSelected && (
+                          <div className="grid gap-3 bg-white px-4 pb-4 md:grid-cols-3">
+                            <div className="rounded-md border border-teal-100 bg-teal-50/60 p-3">
+                              <p className="text-xs font-semibold text-teal-800">相关证据</p>
+                              <div className="mt-2 grid gap-2">
+                                {themeEvidence.slice(0, 3).map((item) => (
+                                  <p key={item.id} className="break-words text-xs leading-5 text-zinc-700">{item.title}</p>
+                                ))}
+                                {themeEvidence.length === 0 && <p className="text-xs text-zinc-500">暂无证据</p>}
+                              </div>
+                            </div>
+                            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+                              <p className="text-xs font-semibold text-zinc-600">关联主题</p>
+                              <div className="mt-2 grid gap-2">
+                                {themeRelations.map((relation) => {
+                                  const linkedId = relation.leftThemeId === theme.id ? relation.rightThemeId : relation.leftThemeId;
+                                  const linkedTheme = intelligence.themes.find((item) => item.id === linkedId);
+                                  return (
+                                    <p key={`${relation.leftThemeId}-${relation.rightThemeId}`} className="break-words text-xs leading-5 text-zinc-700">
+                                      {relation.level} · {linkedTheme?.title}
+                                    </p>
+                                  );
+                                })}
+                                {themeRelations.length === 0 && <p className="text-xs text-zinc-500">暂无关联主题</p>}
+                              </div>
+                            </div>
+                            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+                              <p className="text-xs font-semibold text-zinc-600">机会状态</p>
+                              <p className="mt-2 break-words text-xs leading-5 text-zinc-700">
+                                {themeOpportunity ? `${themeOpportunity.status} · ${themeOpportunity.nextStep}` : "尚未进入机会池"}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </section>
 
@@ -686,12 +862,117 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
+                <div className="mt-5 rounded-md border border-teal-200 bg-teal-50/60 p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <h3 className="text-lg font-semibold">人工修正</h3>
+                    <Badge className="border-teal-200 bg-white text-teal-700">本机草稿</Badge>
+                  </div>
+                  <div className="mt-4 grid gap-4 lg:grid-cols-4">
+                    <div className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">优先级修正</span>
+                      <SegmentedButtons<Priority>
+                        value={selectedManualReview.priority}
+                        options={["高", "中", "低"]}
+                        onChange={(priority) => updateManualReview({ priority })}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">综合评级</span>
+                      <SegmentedButtons<Priority>
+                        value={selectedManualReview.rating}
+                        options={["高", "中", "低"]}
+                        onChange={(rating) => updateManualReview({ rating })}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">需求强度</span>
+                      <SegmentedButtons<Priority>
+                        value={selectedManualReview.demandStrength}
+                        options={["高", "中", "低"]}
+                        onChange={(demandStrength) => updateManualReview({ demandStrength })}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">竞品响应</span>
+                      <SegmentedButtons<Priority>
+                        value={selectedManualReview.competitorResponse}
+                        options={["高", "中", "低"]}
+                        onChange={(competitorResponse) => updateManualReview({ competitorResponse })}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">可执行性</span>
+                      <SegmentedButtons<Priority>
+                        value={selectedManualReview.actionability}
+                        options={["高", "中", "低"]}
+                        onChange={(actionability) => updateManualReview({ actionability })}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">风险提示</span>
+                      <SegmentedButtons<Priority>
+                        value={selectedManualReview.risk}
+                        options={["高", "中", "低"]}
+                        onChange={(risk) => updateManualReview({ risk })}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">关联确认</span>
+                      <SegmentedButtons<ManualReview["relationDecision"]>
+                        value={selectedManualReview.relationDecision}
+                        options={["已确认", "待确认", "不关联"]}
+                        onChange={(relationDecision) => updateManualReview({ relationDecision })}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">机会决策</span>
+                      <SegmentedButtons<ManualReview["opportunityDecision"]>
+                        value={selectedManualReview.opportunityDecision}
+                        options={["进入机会池", "继续观察", "暂不处理"]}
+                        onChange={(opportunityDecision) => updateManualReview({ opportunityDecision })}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+                    <div>
+                      <p className="text-xs font-semibold text-zinc-500">建议动作</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {actionOptions.map((action) => {
+                          const checked = selectedManualReview.actions.includes(action);
+                          return (
+                            <button
+                              key={action}
+                              onClick={() => toggleManualAction(action)}
+                              className={`h-9 rounded-md border px-3 text-sm font-semibold transition ${
+                                checked
+                                  ? "border-teal-500 bg-white text-teal-800"
+                                  : "border-zinc-200 bg-zinc-50 text-zinc-500 hover:text-zinc-950"
+                              }`}
+                            >
+                              {action}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">备注</span>
+                      <textarea
+                        value={selectedManualReview.note}
+                        onChange={(event) => updateManualReview({ note: event.target.value })}
+                        rows={4}
+                        className="min-h-28 resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 outline-none transition focus:border-teal-500"
+                        placeholder="人工判断、风险边界、后续验证点"
+                      />
+                    </label>
+                  </div>
+                </div>
                 <div className="mt-5 grid gap-3 md:grid-cols-2">
                   <div className="rounded-md border border-zinc-200 p-4">
                     <p className="text-sm font-semibold">核心证据</p>
                     <div className="mt-3 grid gap-3">
                       {selectedEvidence.filter((item) => item.role === "核心证据").map((item) => (
-                        <p key={item.id} className="text-sm leading-6 text-zinc-600">{item.title}</p>
+                        <p key={item.id} className="break-words text-sm leading-6 text-zinc-600">{item.title}</p>
                       ))}
                     </div>
                   </div>
@@ -699,11 +980,46 @@ export default function Home() {
                     <p className="text-sm font-semibold">参考信息</p>
                     <div className="mt-3 grid gap-3">
                       {selectedEvidence.filter((item) => item.role === "参考信息").map((item) => (
-                        <p key={item.id} className="text-sm leading-6 text-zinc-600">{item.title}</p>
+                        <p key={item.id} className="break-words text-sm leading-6 text-zinc-600">{item.title}</p>
                       ))}
                       {selectedEvidence.filter((item) => item.role === "参考信息").length === 0 && (
                         <p className="text-sm text-zinc-500">暂无参考信息</p>
                       )}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-5 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-md border border-zinc-200 p-4">
+                    <p className="text-sm font-semibold">关联判断</p>
+                    <div className="mt-3 grid gap-3">
+                      {selectedRelations.map((relation) => {
+                        const linkedId = relation.leftThemeId === selectedTheme.id ? relation.rightThemeId : relation.leftThemeId;
+                        const linkedTheme = intelligence.themes.find((theme) => theme.id === linkedId);
+                        return (
+                          <div key={`${relation.leftThemeId}-${relation.rightThemeId}`} className="rounded bg-zinc-50 p-3">
+                            <p className="break-words text-sm font-semibold text-zinc-700">{relation.level} · {linkedTheme?.title}</p>
+                            <p className="mt-1 break-words text-xs leading-5 text-zinc-500">{relation.reason}</p>
+                          </div>
+                        );
+                      })}
+                      {selectedRelations.length === 0 && <p className="text-sm text-zinc-500">暂无关联判断</p>}
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-zinc-200 p-4">
+                    <p className="text-sm font-semibold">机会建议</p>
+                    <div className="mt-3 grid gap-3">
+                      {selectedOpportunities.map((opportunity) => (
+                        <div key={opportunity.id} className="rounded bg-zinc-50 p-3">
+                          <div className="flex flex-wrap gap-2">
+                            <Badge className="border-cyan-200 bg-cyan-50 text-cyan-700">{opportunity.type}</Badge>
+                            <Badge className="border-amber-200 bg-amber-50 text-amber-800">{opportunity.feasibility}</Badge>
+                            <Badge className="border-zinc-200 bg-white text-zinc-700">{opportunity.status}</Badge>
+                          </div>
+                          <p className="mt-2 break-words text-sm font-semibold">{opportunity.title}</p>
+                          <p className="mt-1 break-words text-xs leading-5 text-zinc-500">{opportunity.nextStep}</p>
+                        </div>
+                      ))}
+                      {selectedOpportunities.length === 0 && <p className="text-sm text-zinc-500">尚未进入机会池</p>}
                     </div>
                   </div>
                 </div>
@@ -719,15 +1035,25 @@ export default function Home() {
                 {intelligence.evidence.map((item) => (
                   <article key={item.id} className="rounded-md border border-zinc-200 p-4">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div>
+                      <div className="min-w-0">
                         <div className="flex flex-wrap gap-2">
                           <Badge className={item.role === "核心证据" ? "border-teal-200 bg-teal-50 text-teal-700" : "border-zinc-200 bg-zinc-50 text-zinc-600"}>
                             {item.role}
                           </Badge>
                           <Badge className="border-zinc-200 bg-white text-zinc-600">{item.sourceType}</Badge>
                         </div>
-                        <h3 className="mt-3 text-base font-semibold">{item.title}</h3>
-                        <p className="mt-2 text-sm leading-6 text-zinc-600">{item.summary}</p>
+                        <h3 className="mt-3 break-words text-base font-semibold">{item.title}</h3>
+                        <p className="mt-2 break-words text-sm leading-6 text-zinc-600">{item.summary}</p>
+                        {item.url && (
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-3 inline-flex text-sm font-semibold text-teal-700 hover:text-teal-900"
+                          >
+                            查看来源
+                          </a>
+                        )}
                       </div>
                       <div className="min-w-36 text-sm text-zinc-500">
                         <p>{item.source}</p>

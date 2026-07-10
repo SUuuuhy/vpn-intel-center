@@ -6,6 +6,7 @@ const RULES_PATH = new URL("../data/source-rules.json", import.meta.url);
 const MAX_ITEMS_PER_SOURCE = 8;
 const FETCH_TIMEOUT_MS = 12000;
 const dryRun = process.argv.includes("--dry-run");
+const sanitizeOnly = process.argv.includes("--sanitize-only");
 
 const now = new Date();
 const generatedAt = now.toISOString();
@@ -23,33 +24,37 @@ const existingEvidenceIds = new Set(data.evidence.map((item) => item.id));
 const fetchedEvidence = [];
 const failures = [];
 
-for (const source of rules.sources) {
-  try {
-    const text = await fetchText(source.url);
-    const items = source.mode === "rss" ? parseRss(text) : parseHtmlTitle(text, source.url);
-    for (const item of items.slice(0, MAX_ITEMS_PER_SOURCE)) {
-      const classified = classifyItem(item, source, rules.keywords);
-      if (!classified) continue;
-      if (existingEvidenceIds.has(classified.id)) continue;
-      existingEvidenceIds.add(classified.id);
-      fetchedEvidence.push(classified);
+if (!sanitizeOnly) {
+  for (const source of rules.sources) {
+    try {
+      const text = await fetchText(source.url);
+      const items = source.mode === "rss" ? parseRss(text) : parseHtmlTitle(text, source.url);
+      for (const item of items.slice(0, MAX_ITEMS_PER_SOURCE)) {
+        const classified = classifyItem(item, source, rules.keywords);
+        if (!classified) continue;
+        if (existingEvidenceIds.has(classified.id)) continue;
+        existingEvidenceIds.add(classified.id);
+        fetchedEvidence.push(classified);
+      }
+    } catch (error) {
+      failures.push({ source: source.id, message: error.message });
     }
-  } catch (error) {
-    failures.push({ source: source.id, message: error.message });
   }
 }
 
 const mergedEvidence = [...fetchedEvidence, ...data.evidence].slice(0, 80);
 const highPriorityToday = fetchedEvidence.filter((item) => item.role === "核心证据").length;
 
-data.generatedAt = generatedAt;
-data.displayDate = displayDate;
-data.status.newItemsToday = fetchedEvidence.length;
-data.status.highPriorityToday = highPriorityToday;
-data.status.pendingReview = Math.max(data.status.pendingReview, failures.length);
-data.status.normalSourceRate = Math.round(((rules.sources.length - failures.length) / Math.max(1, rules.sources.length)) * 100);
-data.status.sourcesWaitingReview = failures.length;
-data.evidence = mergedEvidence;
+if (!sanitizeOnly) {
+  data.generatedAt = generatedAt;
+  data.displayDate = displayDate;
+  data.status.newItemsToday = fetchedEvidence.length;
+  data.status.highPriorityToday = highPriorityToday;
+  data.status.pendingReview = Math.max(data.status.pendingReview, failures.length);
+  data.status.normalSourceRate = Math.round(((rules.sources.length - failures.length) / Math.max(1, rules.sources.length)) * 100);
+  data.status.sourcesWaitingReview = failures.length;
+}
+data.evidence = sanitizeEvidenceList(mergedEvidence);
 
 const latestBriefings = fetchedEvidence
   .filter((item) => item.role === "核心证据")
@@ -65,12 +70,14 @@ const latestBriefings = fetchedEvidence
     evidence: 1,
     source: item.source,
     time: item.time,
+    url: item.url,
   }));
 
-if (latestBriefings.length > 0) {
+if (!sanitizeOnly && latestBriefings.length > 0) {
   const retained = data.briefingItems.filter((item) => !item.id.startsWith(`auto-${displayDate}`));
   data.briefingItems = [...latestBriefings, ...retained].slice(0, 24);
 }
+data.briefingItems = sanitizeBriefingList(data.briefingItems, data.evidence);
 
 if (!dryRun) {
   await writeFile(DATA_PATH, `${JSON.stringify(data, null, 2)}\n`);
@@ -79,7 +86,7 @@ if (!dryRun) {
 if (failures.length > 0) {
   console.warn("Some sources failed:", JSON.stringify(failures));
 }
-console.log(`${dryRun ? "Dry run:" : "Updated"} ${fetchedEvidence.length} new evidence items for ${displayDate}.`);
+console.log(`${dryRun ? "Dry run:" : sanitizeOnly ? "Sanitized" : "Updated"} ${fetchedEvidence.length} new evidence items for ${displayDate}.`);
 
 async function fetchText(url) {
   const controller = new AbortController();
@@ -123,16 +130,52 @@ function readTag(xml, tag) {
 }
 
 function cleanXml(value) {
+  return stripHtml(decodeEntities(value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")));
+}
+
+function decodeEntities(value) {
   return value
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
     .replace(/<[^>]+>/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, "\"")
     .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, num) => String.fromCodePoint(Number.parseInt(num, 10)));
+}
+
+function stripHtml(value) {
+  return value
+    .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function cleanSummary(value, fallback = "") {
+  const cleaned = cleanXml(value || fallback);
+  return cleaned.replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim() || fallback;
+}
+
+function sanitizeEvidenceList(items) {
+  return items.map((item) => ({
+    ...item,
+    title: cleanSummary(item.title, item.title),
+    summary: cleanSummary(item.summary, item.title),
+  }));
+}
+
+function sanitizeBriefingList(items, evidenceItems) {
+  const urlByTitle = new Map(evidenceItems.filter((item) => item.url).map((item) => [item.title, item.url]));
+  return items.map((item) => ({
+    ...item,
+    title: cleanSummary(item.title, item.title),
+    summary: cleanSummary(item.summary, item.title),
+    url: item.url || urlByTitle.get(cleanSummary(item.title, item.title)),
+  }));
 }
 
 function classifyItem(item, source, keywords) {
@@ -163,10 +206,10 @@ function classifyItem(item, source, keywords) {
     id: `auto-${id}`,
     role: score >= 4 ? "核心证据" : "参考信息",
     themeId,
-    title: item.title,
+    title: cleanSummary(item.title, item.title),
     sourceType: source.category,
     source: source.name,
-    summary: item.summary || `${source.name} 捕捉到与 VPN 市场相关的新信息。`,
+    summary: cleanSummary(item.summary, `${source.name} 捕捉到与 VPN 市场相关的新信息。`),
     time,
     url: item.link || source.url,
   };
