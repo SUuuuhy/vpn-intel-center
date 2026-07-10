@@ -1,6 +1,7 @@
 "use client";
 
 import intelligenceData from "@/data/intelligence.json";
+import sourceRulesData from "@/data/source-rules.json";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 type Trend = "新出现" | "升温" | "稳定" | "降温" | "样本不足";
@@ -11,6 +12,26 @@ type SourceWeight = "高" | "中" | "中低" | "低";
 type ThemeType = "需求型" | "动作型";
 type ReviewStatus = "系统建议" | "待确认" | "已人工确认";
 type LinkQuality = "原始链接" | "搜索页" | "新闻聚合" | "待解析";
+
+type SourceRule = {
+  id: string;
+  name: string;
+  category: string;
+  secondaryCategory: string;
+  granularity: string;
+  market: string;
+  competitor: string;
+  scene: string;
+  isCore: boolean;
+  crawlMethod: string;
+  url: string;
+  mode: string;
+  frequency: string;
+};
+
+type SourceRuleInput = Partial<Omit<SourceRule, "isCore">> & {
+  isCore?: boolean | string | number;
+};
 
 type BriefingItem = {
   id: string;
@@ -128,7 +149,15 @@ type IntelligenceData = {
   manualReviews?: ManualReview[];
 };
 
+type SourceRulesData = {
+  timezone: string;
+  marketFocus: string[];
+  keywords: Record<string, string[]>;
+  sources: SourceRule[];
+};
+
 const intelligence = intelligenceData as IntelligenceData;
+const sourceRules = sourceRulesData as SourceRulesData;
 
 const sourceStats = [
   { name: "竞品情报", total: 116, active: 101, freq: "按页/账号分频", color: "bg-teal-500" },
@@ -456,6 +485,23 @@ const linkQualityStyles: Record<LinkQuality, string> = {
 
 const actionOptions = ["产品能力验证", "SEO页面", "内容选题", "落地页优化", "广告投放", "价格/活动策略", "合作渠道", "客服/运营响应"];
 const sourceCategories = ["竞品情报", "用户声音", "SEO搜索", "第三方媒体", "政策监管", "需求触发市场"];
+const sourceFrequencies = ["daily", "weekly", "event", "manual", "paused"];
+const sourceCrawlMethods = ["RSS", "HTML", "API", "SERP", "Social", "Manual"];
+const sourceFrequencyLabels: Record<string, string> = {
+  daily: "每日",
+  weekly: "每周",
+  event: "事件触发",
+  manual: "手动维护",
+  paused: "暂停",
+};
+const sourceCrawlMethodLabels: Record<string, string> = {
+  RSS: "RSS",
+  HTML: "页面抓取",
+  API: "API",
+  SERP: "搜索结果",
+  Social: "社媒抓取",
+  Manual: "手动录入",
+};
 const competitorNames = ["NordVPN", "ExpressVPN", "Surfshark", "Proton VPN", "CyberGhost", "PIA VPN"];
 const sourceTagDefinitions = [
   ["信源大类", "说明信息来自竞品官方、用户论坛、SEO、第三方媒体、政策监管还是需求触发市场。"],
@@ -480,6 +526,142 @@ type SourceTagInput = {
 function sourceCategoryLabel(sourceType: string) {
   if (sourceType === "平台服务生态" || sourceType === "相关平台") return "需求触发市场";
   return sourceType;
+}
+
+function sourceFrequencyLabel(frequency: string) {
+  return sourceFrequencyLabels[frequency] ?? frequency;
+}
+
+function sourceCrawlMethodLabel(method: string) {
+  return sourceCrawlMethodLabels[method] ?? method;
+}
+
+function createEmptySourceRule(): SourceRule {
+  return {
+    id: "",
+    name: "",
+    category: "竞品情报",
+    secondaryCategory: "",
+    granularity: "关键词级",
+    market: "US",
+    competitor: "",
+    scene: "",
+    isCore: true,
+    crawlMethod: "RSS",
+    url: "",
+    mode: "rss",
+    frequency: "daily",
+  };
+}
+
+function createSourceId(name: string) {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return slug || `source-${Date.now()}`;
+}
+
+function normalizeSourceRule(input: SourceRuleInput): SourceRule {
+  const name = String(input.name ?? "").trim();
+  const isCoreValue = input.isCore;
+  return {
+    ...createEmptySourceRule(),
+    ...input,
+    id: String(input.id ?? "").trim() || createSourceId(name),
+    name,
+    category: sourceCategoryLabel(String(input.category ?? "竞品情报").trim()),
+    secondaryCategory: String(input.secondaryCategory ?? "").trim(),
+    granularity: String(input.granularity ?? "关键词级").trim(),
+    market: String(input.market ?? "").trim(),
+    competitor: String(input.competitor ?? "").trim(),
+    scene: String(input.scene ?? "").trim(),
+    isCore:
+      isCoreValue === undefined ||
+      isCoreValue === "" ||
+      isCoreValue === true ||
+      String(isCoreValue).toLowerCase() === "true" ||
+      String(isCoreValue) === "1",
+    crawlMethod: String(input.crawlMethod ?? "RSS").trim(),
+    url: String(input.url ?? "").trim(),
+    mode: String(input.mode ?? "").trim() || String(input.crawlMethod ?? "RSS").trim().toLowerCase(),
+    frequency: String(input.frequency ?? "daily").trim(),
+  };
+}
+
+function parseDelimitedRows(text: string) {
+  const delimiter = text.includes("\t") ? "\t" : ",";
+  return text
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => splitDelimitedLine(line, delimiter));
+}
+
+function splitDelimitedLine(line: string, delimiter: string) {
+  const cells: string[] = [];
+  let current = "";
+  let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+    if (char === "\"" && quoted && next === "\"") {
+      current += "\"";
+      index += 1;
+    } else if (char === "\"") {
+      quoted = !quoted;
+    } else if (char === delimiter && !quoted) {
+      cells.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+function parseSourceBatch(text: string) {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    const rows: SourceRuleInput[] = Array.isArray(parsed) ? parsed : Array.isArray(parsed.sources) ? parsed.sources : [];
+    return rows.map((row) => normalizeSourceRule(row));
+  } catch {
+    const rows = parseDelimitedRows(trimmed);
+    const headers = rows[0]?.map((header) => header.trim()) ?? [];
+    return rows.slice(1).map((row) => {
+      const record: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        record[header] = row[index] ?? "";
+      });
+      return normalizeSourceRule(record);
+    });
+  }
+}
+
+function sourcesToCsv(sources: SourceRule[]) {
+  const headers: (keyof SourceRule)[] = [
+    "id",
+    "name",
+    "category",
+    "secondaryCategory",
+    "granularity",
+    "market",
+    "competitor",
+    "scene",
+    "isCore",
+    "crawlMethod",
+    "url",
+    "mode",
+    "frequency",
+  ];
+  const escapeCell = (value: unknown) => `"${String(value ?? "").replace(/"/g, "\"\"")}"`;
+  return [headers.join(","), ...sources.map((source) => headers.map((header) => escapeCell(source[header])).join(","))].join("\n");
 }
 
 function sourceTypeFromBriefing(item: BriefingItem) {
@@ -771,6 +953,13 @@ export default function Home() {
   const [feedbackType, setFeedbackType] = useState("误判");
   const [feedbackNote, setFeedbackNote] = useState("");
   const [feedbackLogs, setFeedbackLogs] = useState<string[]>([]);
+  const [sourceCatalogReady, setSourceCatalogReady] = useState(false);
+  const [managedSources, setManagedSources] = useState<SourceRule[]>(sourceRules.sources);
+  const [sourceQuery, setSourceQuery] = useState("");
+  const [sourceCategoryFilter, setSourceCategoryFilter] = useState("全部");
+  const [sourceForm, setSourceForm] = useState<SourceRule>(createEmptySourceRule());
+  const [batchInput, setBatchInput] = useState("");
+  const [sourceImportMessage, setSourceImportMessage] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -796,6 +985,25 @@ export default function Home() {
     if (!manualReviewsReady) return;
     window.localStorage.setItem("vpn-intel-feedback-logs", JSON.stringify(feedbackLogs));
   }, [feedbackLogs, manualReviewsReady]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      setSourceCatalogReady(true);
+      return;
+    }
+    try {
+      const stored = window.localStorage.getItem("vpn-intel-managed-sources");
+      if (stored) setManagedSources(JSON.parse(stored).map((source: Partial<SourceRule>) => normalizeSourceRule(source)));
+    } catch {
+      setManagedSources(sourceRules.sources);
+    }
+    setSourceCatalogReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!sourceCatalogReady || typeof window === "undefined") return;
+    window.localStorage.setItem("vpn-intel-managed-sources", JSON.stringify(managedSources));
+  }, [managedSources, sourceCatalogReady]);
 
   const visibleBriefing = useMemo(
     () => intelligence.briefingItems.filter((item) => item.period === briefingPeriod && item.priority === "高"),
@@ -938,6 +1146,21 @@ export default function Home() {
     const matchesPriority = historyPriority === "全部" || item.displayPriority === historyPriority;
     return matchesQuery && matchesCategory && matchesPriority;
   });
+  const baseSourceIds = useMemo(() => new Set(sourceRules.sources.map((source) => source.id)), []);
+  const managedSourceCategories = useMemo(
+    () => Array.from(new Set(managedSources.map((source) => source.category).filter(Boolean))),
+    [managedSources],
+  );
+  const filteredManagedSources = managedSources.filter((source) => {
+    const query = sourceQuery.trim().toLowerCase();
+    const text =
+      `${source.name} ${source.url} ${source.category} ${source.secondaryCategory} ${source.market} ${source.competitor} ${source.scene} ${source.crawlMethod} ${sourceCrawlMethodLabel(source.crawlMethod)} ${source.frequency} ${sourceFrequencyLabel(source.frequency)}`.toLowerCase();
+    const matchesQuery = !query || text.includes(query);
+    const matchesCategory = sourceCategoryFilter === "全部" || source.category === sourceCategoryFilter;
+    return matchesQuery && matchesCategory;
+  });
+  const customSourceCount = managedSources.filter((source) => !baseSourceIds.has(source.id)).length;
+  const coreManagedSourceCount = managedSources.filter((source) => source.isCore).length;
   const selectedManualReview = {
     ...createDefaultReview(selectedTheme),
     ...(intelligence.manualReviews?.find((review) => review.themeId === selectedTheme.id) ?? {}),
@@ -996,6 +1219,74 @@ export default function Home() {
     setFeedbackNote("");
   }
 
+  function updateSourceForm<K extends keyof SourceRule>(key: K, value: SourceRule[K]) {
+    setSourceForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function upsertSources(nextSources: SourceRule[]) {
+    setManagedSources((current) => {
+      const byId = new Map(current.map((source) => [source.id, source]));
+      nextSources.forEach((source) => byId.set(source.id, normalizeSourceRule(source)));
+      return Array.from(byId.values());
+    });
+  }
+
+  function submitSourceForm() {
+    const normalized = normalizeSourceRule(sourceForm);
+    if (!normalized.name || !normalized.url) {
+      setSourceImportMessage("请至少填写信源名称和连接。");
+      return;
+    }
+    upsertSources([normalized]);
+    setSourceForm(createEmptySourceRule());
+    setSourceImportMessage(`已添加或更新信源：${normalized.name}`);
+  }
+
+  function importSourceBatch() {
+    try {
+      const parsed = parseSourceBatch(batchInput).filter((source) => source.name && source.url);
+      if (parsed.length === 0) {
+        setSourceImportMessage("没有识别到可导入的信源。");
+        return;
+      }
+      upsertSources(parsed);
+      setBatchInput("");
+      setSourceImportMessage(`已导入或更新 ${parsed.length} 条信源。`);
+    } catch {
+      setSourceImportMessage("导入失败，请检查 JSON、CSV 或 TSV 格式。");
+    }
+  }
+
+  function resetManagedSources() {
+    setManagedSources(sourceRules.sources);
+    setSourceImportMessage("已恢复为仓库内当前信源配置。");
+  }
+
+  function editSource(source: SourceRule) {
+    setSourceForm(normalizeSourceRule(source));
+    setSourceImportMessage(`正在编辑信源：${source.name}`);
+  }
+
+  function removeSource(source: SourceRule) {
+    setManagedSources((current) => current.filter((item) => item.id !== source.id));
+    setSourceImportMessage(`已从维护列表移除信源：${source.name}`);
+  }
+
+  function downloadSourceFile(format: "json" | "csv") {
+    if (typeof window === "undefined") return;
+    const content =
+      format === "json"
+        ? JSON.stringify({ ...sourceRules, sources: managedSources }, null, 2)
+        : sourcesToCsv(managedSources);
+    const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv;charset=utf-8" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `vpn-source-rules.${format}`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  }
+
   return (
     <main className="min-h-screen bg-[#f6f7f4] text-zinc-950">
       <header className="border-b border-zinc-200 bg-white/90 backdrop-blur">
@@ -1021,7 +1312,7 @@ export default function Home() {
       <div className="mx-auto grid max-w-7xl gap-5 px-5 py-5 lg:grid-cols-[220px_1fr]">
         <aside className="lg:sticky lg:top-5 lg:h-fit">
           <nav className="grid gap-2 rounded-md border border-zinc-200 bg-white p-2">
-            {["简报", "主题库", "证据库", "机会池", "信源状态", "标签体系", "规则模型", "反馈配置"].map((view) => (
+            {["简报", "主题库", "证据库", "机会池", "信源状态", "信源维护", "标签体系", "规则模型", "反馈配置"].map((view) => (
               <button
                 key={view}
                 onClick={() => setActiveView(view)}
@@ -1847,6 +2138,340 @@ export default function Home() {
                 ))}
               </div>
             </section>
+          )}
+
+          {activeView === "信源维护" && (
+            <div className="grid gap-5">
+              <section className="rounded-md border border-zinc-200 bg-white p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold">信源维护</h2>
+                    <p className="mt-1 text-sm leading-6 text-zinc-500">
+                      查看当前自动抓取信源，并在本机维护新增或批量导入的候选信源。导出后可合并回仓库配置。
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => downloadSourceFile("json")}
+                      className="h-9 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-600 hover:text-zinc-950"
+                    >
+                      导出 JSON
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadSourceFile("csv")}
+                      className="h-9 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-600 hover:text-zinc-950"
+                    >
+                      导出 CSV
+                    </button>
+                    <button
+                      type="button"
+                      onClick={resetManagedSources}
+                      className="h-9 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-600 hover:text-zinc-950"
+                    >
+                      恢复当前配置
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-3 md:grid-cols-4">
+                  {[
+                    ["当前信源", managedSources.length],
+                    ["核心信源", coreManagedSourceCount],
+                    ["本机新增", customSourceCount],
+                    ["市场范围", sourceRules.marketFocus.join(" / ")],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
+                      <p className="text-xs font-semibold text-zinc-500">{label}</p>
+                      <p className="mt-1 break-words text-xl font-semibold">{value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {sourceImportMessage && (
+                  <p className="mt-4 rounded-md bg-teal-50 p-3 text-sm font-semibold text-teal-800">{sourceImportMessage}</p>
+                )}
+              </section>
+
+              <section className="rounded-md border border-zinc-200 bg-white p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold">全部信源</h2>
+                    <p className="mt-1 text-sm text-zinc-500">展示名称、连接、抓取方式、频率、市场、竞品和场景</p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-[1fr_180px] lg:min-w-[520px]">
+                    <input
+                      value={sourceQuery}
+                      onChange={(event) => setSourceQuery(event.target.value)}
+                      className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500"
+                      placeholder="搜索名称、URL、市场、竞品或场景"
+                    />
+                    <select
+                      value={sourceCategoryFilter}
+                      onChange={(event) => setSourceCategoryFilter(event.target.value)}
+                      className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500"
+                    >
+                      {["全部", ...managedSourceCategories].map((category) => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-5 overflow-x-auto rounded-md border border-zinc-200">
+                  <div className="grid min-w-[1280px] grid-cols-[1.2fr_0.95fr_1.6fr_0.7fr_0.6fr_0.55fr_0.8fr_0.7fr_0.65fr] bg-zinc-50 px-4 py-3 text-xs font-semibold text-zinc-500">
+                    <span>信源名称</span>
+                    <span>分类</span>
+                    <span>连接</span>
+                    <span>抓取方式</span>
+                    <span>频率</span>
+                    <span>市场</span>
+                    <span>竞品/场景</span>
+                    <span>状态</span>
+                    <span>操作</span>
+                  </div>
+                  {filteredManagedSources.map((source) => (
+                    <div
+                      key={source.id}
+                      className="grid min-w-[1280px] grid-cols-[1.2fr_0.95fr_1.6fr_0.7fr_0.6fr_0.55fr_0.8fr_0.7fr_0.65fr] gap-3 border-t border-zinc-200 px-4 py-4 text-sm"
+                    >
+                      <div>
+                        <p className="break-words font-semibold">{source.name}</p>
+                        <p className="mt-1 break-words text-xs text-zinc-500">{source.id}</p>
+                      </div>
+                      <div className="grid gap-1">
+                        <span>{source.category}</span>
+                        <span className="text-xs text-zinc-500">{source.secondaryCategory || "未设置二级分类"}</span>
+                      </div>
+                      <p className="break-all text-xs leading-5 text-zinc-600">{source.url}</p>
+                      <div className="grid gap-1">
+                        <span>{sourceCrawlMethodLabel(source.crawlMethod)}</span>
+                        <span className="text-xs text-zinc-500">{source.mode}</span>
+                      </div>
+                      <span>{sourceFrequencyLabel(source.frequency)}</span>
+                      <span>{source.market || "-"}</span>
+                      <div className="grid gap-1">
+                        <span>{source.competitor || "-"}</span>
+                        <span className="text-xs text-zinc-500">{source.scene || "-"}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge className={source.isCore ? "border-teal-200 bg-teal-50 text-teal-700" : "border-zinc-200 bg-white text-zinc-600"}>
+                          {source.isCore ? "核心" : "参考"}
+                        </Badge>
+                        <Badge className={baseSourceIds.has(source.id) ? "border-zinc-200 bg-zinc-50 text-zinc-600" : "border-amber-200 bg-amber-50 text-amber-800"}>
+                          {baseSourceIds.has(source.id) ? "当前配置" : "本机新增"}
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap items-start gap-2">
+                        <button
+                          type="button"
+                          onClick={() => editSource(source)}
+                          className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-semibold text-zinc-600 hover:text-zinc-950"
+                        >
+                          编辑
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeSource(source)}
+                          className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-semibold text-zinc-600 hover:text-zinc-950"
+                        >
+                          移除
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {filteredManagedSources.length === 0 && (
+                    <div className="p-8 text-center text-sm text-zinc-500">没有匹配的信源</div>
+                  )}
+                </div>
+              </section>
+
+              <section className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
+                <div className="rounded-md border border-zinc-200 bg-white p-5">
+                  <h2 className="text-xl font-semibold">手动添加信源</h2>
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">信源名称</span>
+                      <input
+                        value={sourceForm.name}
+                        onChange={(event) => updateSourceForm("name", event.target.value)}
+                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
+                        placeholder="例如 NordVPN Blog"
+                      />
+                    </label>
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">连接</span>
+                      <input
+                        value={sourceForm.url}
+                        onChange={(event) => updateSourceForm("url", event.target.value)}
+                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
+                        placeholder="https://..."
+                      />
+                    </label>
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">一级分类</span>
+                      <select
+                        value={sourceForm.category}
+                        onChange={(event) => updateSourceForm("category", event.target.value)}
+                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
+                      >
+                        {sourceCategories.map((category) => (
+                          <option key={category} value={category}>{category}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">二级分类</span>
+                      <input
+                        value={sourceForm.secondaryCategory}
+                        onChange={(event) => updateSourceForm("secondaryCategory", event.target.value)}
+                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
+                        placeholder="官网 / 官方账号 / 论坛 / SERP"
+                      />
+                    </label>
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">抓取方式</span>
+                      <select
+                        value={sourceForm.crawlMethod}
+                        onChange={(event) => updateSourceForm("crawlMethod", event.target.value)}
+                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
+                      >
+                        {sourceCrawlMethods.map((method) => (
+                          <option key={method} value={method}>{sourceCrawlMethodLabel(method)}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">抓取频率</span>
+                      <select
+                        value={sourceForm.frequency}
+                        onChange={(event) => updateSourceForm("frequency", event.target.value)}
+                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
+                      >
+                        {sourceFrequencies.map((frequency) => (
+                          <option key={frequency} value={frequency}>{sourceFrequencyLabel(frequency)}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">市场</span>
+                      <input
+                        value={sourceForm.market}
+                        onChange={(event) => updateSourceForm("market", event.target.value)}
+                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
+                        placeholder="US / UK / DE / Global"
+                      />
+                    </label>
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">竞品名称</span>
+                      <input
+                        value={sourceForm.competitor}
+                        onChange={(event) => updateSourceForm("competitor", event.target.value)}
+                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
+                        placeholder="NordVPN / ExpressVPN / Surfshark"
+                      />
+                    </label>
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">需求/动作场景</span>
+                      <input
+                        value={sourceForm.scene}
+                        onChange={(event) => updateSourceForm("scene", event.target.value)}
+                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
+                        placeholder="竞品动作 / 访问困难 / 流媒体访问"
+                      />
+                    </label>
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">颗粒度</span>
+                      <input
+                        value={sourceForm.granularity}
+                        onChange={(event) => updateSourceForm("granularity", event.target.value)}
+                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
+                        placeholder="关键词级 / 账号级 / 对象级"
+                      />
+                    </label>
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">模式</span>
+                      <input
+                        value={sourceForm.mode}
+                        onChange={(event) => updateSourceForm("mode", event.target.value)}
+                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
+                        placeholder="rss / html / api"
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 pt-6 text-sm font-semibold text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={sourceForm.isCore}
+                        onChange={(event) => updateSourceForm("isCore", event.target.checked)}
+                        className="h-4 w-4"
+                      />
+                      核心信源
+                    </label>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={submitSourceForm}
+                    className="mt-5 h-10 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white"
+                  >
+                    添加到维护列表
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSourceForm(createEmptySourceRule())}
+                    className="ml-2 mt-5 h-10 rounded-md border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-600 hover:text-zinc-950"
+                  >
+                    清空表单
+                  </button>
+                </div>
+
+                <div className="rounded-md border border-zinc-200 bg-white p-5">
+                  <h2 className="text-xl font-semibold">批量上传</h2>
+                  <p className="mt-1 text-sm leading-6 text-zinc-500">
+                    支持 JSON 数组、包含 sources 的 JSON，或带表头的 CSV/TSV。字段名建议使用 id、name、category、url、crawlMethod、frequency。
+                  </p>
+                  <label className="mt-4 grid gap-2">
+                    <span className="text-xs font-semibold text-zinc-500">上传文件</span>
+                    <input
+                      type="file"
+                      accept=".json,.csv,.tsv,text/csv,application/json"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) return;
+                        file.text().then((text) => setBatchInput(text));
+                      }}
+                      className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                    />
+                  </label>
+                  <label className="mt-4 grid gap-2">
+                    <span className="text-xs font-semibold text-zinc-500">批量内容</span>
+                    <textarea
+                      value={batchInput}
+                      onChange={(event) => setBatchInput(event.target.value)}
+                      rows={12}
+                      className="min-h-64 resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 font-mono text-xs leading-5 outline-none transition focus:border-teal-500"
+                      placeholder={"name,category,url,crawlMethod,frequency\nNordVPN Blog,竞品情报,https://nordvpn.com/blog/,RSS,daily"}
+                    />
+                  </label>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={importSourceBatch}
+                      className="h-10 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white"
+                    >
+                      导入到维护列表
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBatchInput(sourcesToCsv(managedSources))}
+                      className="h-10 rounded-md border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-600 hover:text-zinc-950"
+                    >
+                      填入当前 CSV
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </div>
           )}
 
           {activeView === "标签体系" && (
