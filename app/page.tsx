@@ -159,14 +159,16 @@ type SourceRulesData = {
 const intelligence = intelligenceData as IntelligenceData;
 const sourceRules = sourceRulesData as SourceRulesData;
 
-const sourceStats = [
-  { name: "竞品情报", total: 116, active: 101, freq: "按页/账号分频", color: "bg-teal-500" },
-  { name: "用户声音", total: 77, active: 66, freq: "每日", color: "bg-indigo-500" },
-  { name: "SEO搜索", total: 42, active: 38, freq: "每周2-3次", color: "bg-cyan-500" },
-  { name: "第三方媒体", total: 71, active: 58, freq: "每周1-2次", color: "bg-amber-500" },
-  { name: "政策监管", total: 57, active: 49, freq: "每周/事件加频", color: "bg-rose-500" },
-  { name: "需求触发市场", total: 109, active: 88, freq: "按对象分频", color: "bg-emerald-500" },
-];
+const sourceCategoryOrder = ["竞品情报", "用户声音", "SEO搜索", "第三方媒体", "政策监管", "需求触发市场"];
+const sourceCategoryMeta: Record<string, Pick<SourceStat, "freq" | "color">> = {
+  "竞品情报": { freq: "按页/账号分频", color: "bg-teal-500" },
+  "用户声音": { freq: "每日", color: "bg-indigo-500" },
+  "SEO搜索": { freq: "每周2-3次", color: "bg-cyan-500" },
+  "第三方媒体": { freq: "每周1-2次", color: "bg-amber-500" },
+  "政策监管": { freq: "每周/事件加频", color: "bg-rose-500" },
+  "需求触发市场": { freq: "按对象分频", color: "bg-emerald-500" },
+};
+const configuredSourceStats = buildSourceStats(sourceRules.sources);
 
 const briefingItems: BriefingItem[] = [
   {
@@ -484,7 +486,7 @@ const linkQualityStyles: Record<LinkQuality, string> = {
 };
 
 const actionOptions = ["产品能力验证", "SEO页面", "内容选题", "落地页优化", "广告投放", "价格/活动策略", "合作渠道", "客服/运营响应"];
-const sourceCategories = ["竞品情报", "用户声音", "SEO搜索", "第三方媒体", "政策监管", "需求触发市场"];
+const sourceCategories = sourceCategoryOrder;
 const sourceFrequencies = ["daily", "weekly", "event", "manual", "paused"];
 const sourceCrawlMethods = ["RSS", "HTML", "API", "SERP", "Social", "Manual"];
 const sourceFrequencyLabels: Record<string, string> = {
@@ -534,6 +536,37 @@ function sourceFrequencyLabel(frequency: string) {
 
 function sourceCrawlMethodLabel(method: string) {
   return sourceCrawlMethodLabels[method] ?? method;
+}
+
+function buildSourceStats(sources: SourceRule[]): SourceStat[] {
+  const counts = new Map<string, { total: number; active: number }>();
+  sources.forEach((source) => {
+    const category = sourceCategoryLabel(source.category);
+    const current = counts.get(category) ?? { total: 0, active: 0 };
+    current.total += 1;
+    if (source.frequency !== "paused" && source.frequency !== "manual") current.active += 1;
+    counts.set(category, current);
+  });
+
+  return sourceCategoryOrder.map((category) => {
+    const count = counts.get(category) ?? { total: 0, active: 0 };
+    return {
+      name: category,
+      total: count.total,
+      active: count.active,
+      freq: sourceCategoryMeta[category]?.freq ?? "按规则分频",
+      color: sourceCategoryMeta[category]?.color ?? "bg-zinc-500",
+    };
+  });
+}
+
+function mergeManagedSources(baseSources: SourceRule[], storedSources: SourceRuleInput[]) {
+  const byId = new Map(baseSources.map((source) => [source.id, normalizeSourceRule(source)]));
+  storedSources.forEach((source) => {
+    const normalized = normalizeSourceRule(source);
+    if (normalized.name && normalized.url) byId.set(normalized.id, normalized);
+  });
+  return Array.from(byId.values());
 }
 
 function createEmptySourceRule(): SourceRule {
@@ -993,7 +1026,7 @@ export default function Home() {
     }
     try {
       const stored = window.localStorage.getItem("vpn-intel-managed-sources");
-      if (stored) setManagedSources(JSON.parse(stored).map((source: Partial<SourceRule>) => normalizeSourceRule(source)));
+      if (stored) setManagedSources(mergeManagedSources(sourceRules.sources, JSON.parse(stored) as SourceRuleInput[]));
     } catch {
       setManagedSources(sourceRules.sources);
     }
@@ -1175,8 +1208,8 @@ export default function Home() {
   ]).size;
   const validatingOpportunityCount = intelligence.opportunities.filter((opportunity) => opportunity.status === "验证中").length;
   const waitingOpportunityCount = intelligence.opportunities.filter((opportunity) => opportunity.status === "待评估").length;
-  const totalSourceCount = intelligence.sourceStats.reduce((sum, source) => sum + source.total, 0);
-  const activeSourceCount = intelligence.sourceStats.reduce((sum, source) => sum + source.active, 0);
+  const totalSourceCount = configuredSourceStats.reduce((sum, source) => sum + source.total, 0);
+  const activeSourceCount = configuredSourceStats.reduce((sum, source) => sum + source.active, 0);
   const lastUpdatedTime = new Intl.DateTimeFormat("zh-CN", {
     timeZone: "Asia/Shanghai",
     hour: "2-digit",
@@ -1298,7 +1331,7 @@ export default function Home() {
             </h1>
           </div>
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-            {intelligence.sourceStats.map((source) => (
+            {configuredSourceStats.map((source) => (
               <div key={source.name} className="min-w-24 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
                 <div className={`mb-2 h-1.5 rounded-full ${source.color}`} />
                 <p className="text-xs font-medium text-zinc-500">{source.name}</p>
@@ -2651,7 +2684,7 @@ export default function Home() {
                     ["已覆盖", "每日更新、6类信源框架、中文摘要、原链接展示、主题聚合、人工修正、机会池。"],
                     ["新补齐", "L0-L5、P0-P3、重点事件池、L2候选洞察、历史筛选、规则模型、反馈记录。"],
                     ["仍需后端", "多人共享人工反馈、信源启停、操作日志、长期历史序列、真正的搜索引擎排名抓取。"],
-                    ["下一步建议", "把 source-rules.json 扩展为完整信源库字段，并接入更细的 Reddit/SEO/对象池。"],
+                    ["下一步建议", "为不同平台接入更细的抓取器、多人共享维护和变更审核记录。"],
                   ].map(([title, body]) => (
                     <div key={title} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
                       <p className="text-sm font-semibold">{title}</p>
@@ -2668,7 +2701,7 @@ export default function Home() {
               <h2 className="text-xl font-semibold">信源状态</h2>
               <p className="mt-1 text-sm text-zinc-500">信源 {totalSourceCount} · 启用 {activeSourceCount} · 今日正常 {intelligence.status.normalSourceRate}%</p>
               <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {intelligence.sourceStats.map((source) => (
+                {configuredSourceStats.map((source) => (
                   <article key={source.name} className="rounded-md border border-zinc-200 p-4">
                     <div className={`h-2 rounded-full ${source.color}`} />
                     <div className="mt-4 flex items-start justify-between gap-3">

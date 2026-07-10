@@ -19,13 +19,14 @@ const displayDate = new Intl.DateTimeFormat("en-CA", {
 
 const data = JSON.parse(await readFile(DATA_PATH, "utf8"));
 const rules = JSON.parse(await readFile(RULES_PATH, "utf8"));
+const scheduledSources = rules.sources.filter((source) => shouldCrawlSource(source, now));
 
 const existingEvidenceIds = new Set(data.evidence.map((item) => item.id));
 const fetchedEvidence = [];
 const failures = [];
 
 if (!sanitizeOnly) {
-  for (const source of rules.sources) {
+  for (const source of scheduledSources) {
     try {
       const text = await fetchText(source.url);
       const items = source.mode === "rss" ? parseRss(text) : parseHtmlTitle(text, source.url);
@@ -51,9 +52,10 @@ if (!sanitizeOnly) {
   data.status.newItemsToday = fetchedEvidence.length;
   data.status.highPriorityToday = highPriorityToday;
   data.status.pendingReview = Math.max(data.status.pendingReview, failures.length);
-  data.status.normalSourceRate = Math.round(((rules.sources.length - failures.length) / Math.max(1, rules.sources.length)) * 100);
+  data.status.normalSourceRate = Math.round(((scheduledSources.length - failures.length) / Math.max(1, scheduledSources.length)) * 100);
   data.status.sourcesWaitingReview = failures.length;
 }
+data.sourceStats = buildSourceStats(rules.sources);
 data.evidence = sanitizeEvidenceList(mergedEvidence);
 
 const latestBriefings = fetchedEvidence
@@ -87,7 +89,63 @@ if (!dryRun) {
 if (failures.length > 0) {
   console.warn("Some sources failed:", JSON.stringify(failures));
 }
-console.log(`${dryRun ? "Dry run:" : sanitizeOnly ? "Sanitized" : "Updated"} ${fetchedEvidence.length} new evidence items for ${displayDate}.`);
+console.log(
+  `${dryRun ? "Dry run:" : sanitizeOnly ? "Sanitized" : "Updated"} ${fetchedEvidence.length} new evidence items for ${displayDate}. Checked ${scheduledSources.length}/${rules.sources.length} scheduled sources.`,
+);
+
+function shouldCrawlSource(source, date) {
+  const frequency = String(source.frequency || "daily").toLowerCase();
+  if (frequency === "paused" || frequency === "manual") return false;
+  if (frequency === "weekly") return shanghaiWeekday(date) === "Mon";
+  return true;
+}
+
+function shanghaiWeekday(date) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Shanghai",
+    weekday: "short",
+  }).format(date);
+}
+
+function buildSourceStats(sources) {
+  const categoryOrder = ["竞品情报", "用户声音", "SEO搜索", "第三方媒体", "政策监管", "需求触发市场"];
+  const categoryMeta = {
+    "竞品情报": { freq: "按页/账号分频", color: "bg-teal-500" },
+    "用户声音": { freq: "每日", color: "bg-indigo-500" },
+    "SEO搜索": { freq: "每周2-3次", color: "bg-cyan-500" },
+    "第三方媒体": { freq: "每周1-2次", color: "bg-amber-500" },
+    "政策监管": { freq: "每周/事件加频", color: "bg-rose-500" },
+    "需求触发市场": { freq: "按对象分频", color: "bg-emerald-500" },
+  };
+  const counts = new Map();
+
+  for (const source of sources) {
+    const category = normalizeSourceCategory(source.category);
+    const current = counts.get(category) ?? { total: 0, active: 0 };
+    current.total += 1;
+    if (source.frequency !== "paused" && source.frequency !== "manual") current.active += 1;
+    counts.set(category, current);
+  }
+
+  return categoryOrder.map((category) => {
+    const count = counts.get(category) ?? { total: 0, active: 0 };
+    return {
+      name: category,
+      total: count.total,
+      active: count.active,
+      freq: categoryMeta[category].freq,
+      color: categoryMeta[category].color,
+    };
+  });
+}
+
+function normalizeSourceCategory(category) {
+  if (category === "用户声音（UGC）") return "用户声音";
+  if (category === "SEO 搜索结果") return "SEO搜索";
+  if (category === "政策与监管") return "政策监管";
+  if (category === "相关市场" || category === "平台服务生态" || category === "相关平台") return "需求触发市场";
+  return category;
+}
 
 async function fetchText(url) {
   const controller = new AbortController();
