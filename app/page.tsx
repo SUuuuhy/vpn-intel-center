@@ -435,10 +435,101 @@ const displayPriorityStyles: Record<DisplayPriority, string> = {
 
 const actionOptions = ["产品能力验证", "SEO页面", "内容选题", "落地页优化", "广告投放", "价格/活动策略", "合作渠道", "客服/运营响应"];
 const sourceCategories = ["竞品情报", "用户声音", "SEO搜索", "第三方媒体", "政策监管", "需求触发市场"];
+const competitorNames = ["NordVPN", "ExpressVPN", "Surfshark", "Proton VPN", "CyberGhost", "PIA VPN"];
+const sourceTagDefinitions = [
+  ["信源大类", "说明信息来自竞品官方、用户论坛、SEO、第三方媒体、政策监管还是需求触发市场。"],
+  ["来源形态", "说明这条信息来自官网、官方账号、论坛/社区、搜索结果、新闻聚合或媒体评测。"],
+  ["来源对象", "标记具体网站、账号、竞品或平台，例如 NordVPN、Surfshark、Reddit、Google SERP。"],
+  ["用户市场", "只在能够从标题、摘要或信源中识别时标记用户所在国家或区域。"],
+];
+
+type SourceTagInput = {
+  sourceType?: string;
+  source: string;
+  title: string;
+  summary: string;
+  originalTitle?: string;
+  url?: string;
+};
 
 function sourceCategoryLabel(sourceType: string) {
   if (sourceType === "平台服务生态" || sourceType === "相关平台") return "需求触发市场";
   return sourceType;
+}
+
+function sourceTypeFromBriefing(item: BriefingItem) {
+  if (item.type === "竞品动作") return "竞品情报";
+  if (item.type === "需求信号") return "用户声音";
+  if (item.type === "外部变化") return "政策监管";
+  return "主题关联";
+}
+
+function compactSourceTags(item: SourceTagInput) {
+  const sourceType = sourceCategoryLabel(item.sourceType ?? "其他");
+  const tags = [
+    sourceType,
+    inferSourceFormat(item),
+    inferSourceEntity(item),
+    inferMarketTag(item),
+  ].filter(Boolean) as string[];
+
+  return Array.from(new Set(tags)).slice(0, 4);
+}
+
+function inferSourceFormat(item: SourceTagInput) {
+  const text = `${item.sourceType ?? ""} ${item.source} ${item.title} ${item.summary} ${item.originalTitle ?? ""} ${item.url ?? ""}`.toLowerCase();
+  const originalTitle = (item.originalTitle ?? "").toLowerCase();
+  const officialPublisher = competitorNames.some((name) => originalTitle.endsWith(`- ${name.toLowerCase()}`));
+  if (/reddit|forum|community|quora|ugc/.test(text)) return "论坛/社区";
+  if (/youtube|tiktok|instagram|twitter|x\.com|官方账号/.test(text)) return "官方账号";
+  if (/pricing|价格页/.test(text)) return "官网/价格页";
+  if (/google news|news\.google/.test(text) && !officialPublisher) return "新闻聚合";
+  if (officialPublisher) return "官网";
+  if ((item.sourceType === "竞品情报" || sourceCategoryLabel(item.sourceType ?? "") === "竞品情报") && /^(nordvpn|expressvpn|surfshark|proton vpn|cyberghost|pia vpn)/.test(item.source.toLowerCase())) return "官网";
+  if (/google news|news\.google/.test(text)) return "新闻聚合";
+  if (/serp|seo|google search|search\?q=/.test(text)) return "搜索结果";
+  if (item.sourceType === "第三方媒体") return "媒体评测";
+  if (item.sourceType === "政策监管") return "政策/媒体";
+  return "网页";
+}
+
+function inferSourceEntity(item: SourceTagInput) {
+  const text = `${item.source} ${item.title} ${item.summary} ${item.originalTitle ?? ""}`.toLowerCase();
+  const matchedCompetitor = competitorNames.find((name) => text.includes(name.toLowerCase()));
+  if (matchedCompetitor) return matchedCompetitor;
+  if (text.includes("reddit")) return "Reddit";
+  if (text.includes("google serp")) return "Google SERP";
+  if (text.includes("google news")) return "Google News";
+  if (text.includes("bbc iplayer")) return "BBC iPlayer";
+  if (text.includes("netflix")) return "Netflix";
+  if (text.includes("world cup")) return "World Cup";
+  return item.source.length > 18 ? item.source.slice(0, 18) : item.source;
+}
+
+function inferMarketTag(item: SourceTagInput) {
+  const text = `${item.title} ${item.summary} ${item.source} ${item.originalTitle ?? ""}`.toLowerCase();
+  if (/美国|us|united states/.test(text)) return "美国";
+  if (/英国|uk|britain|bbc/.test(text)) return "英国";
+  if (/德国|de|germany/.test(text)) return "德国";
+  if (/eu|europe|欧盟/.test(text)) return "欧盟";
+  if (/global|world cup|worldwide|全球/.test(text)) return "全球";
+  return "";
+}
+
+function isOfficialCompetitorEvidence(item: Evidence) {
+  if (sourceCategoryLabel(item.sourceType) !== "竞品情报") return false;
+  const source = item.source.toLowerCase();
+  const title = `${item.title} ${item.summary} ${item.originalTitle ?? ""}`.toLowerCase();
+  const directOfficial = /^(nordvpn|expressvpn|surfshark|proton vpn|cyberghost|pia vpn)/.test(source);
+  const officialSurface = /pricing|youtube|官网|官方|价格页/.test(source) || /官网|官方|价格页/.test(title);
+  const publisherIsCompetitor = competitorNames.some((name) => title.endsWith(`- ${name.toLowerCase()}`));
+  return directOfficial || officialSurface || publisherIsCompetitor;
+}
+
+function isUserForumEvidence(item: Evidence) {
+  if (sourceCategoryLabel(item.sourceType) !== "用户声音") return false;
+  const text = `${item.source} ${item.title} ${item.summary} ${item.originalTitle ?? ""} ${item.url ?? ""}`.toLowerCase();
+  return /reddit|forum|community|quora|ugc|用户讨论|讨论/.test(text);
 }
 
 function inferDisplayPriority(item: Pick<Evidence, "role" | "sourceType" | "title" | "summary">): DisplayPriority {
@@ -495,6 +586,18 @@ function Badge({ children, className = "" }: { children: ReactNode; className?: 
     <span className={`inline-flex h-7 items-center rounded-full border px-3 text-xs font-semibold ${className}`}>
       {children}
     </span>
+  );
+}
+
+function SourceTagRow({ tags }: { tags: string[] }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {tags.map((tag) => (
+        <span key={tag} className="inline-flex h-7 items-center rounded-full border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-600">
+          {tag}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -664,12 +767,15 @@ export default function Home() {
       intelligence.evidence.map((item) => ({
         ...item,
         sourceCategory: sourceCategoryLabel(item.sourceType),
+        sourceTags: compactSourceTags(item),
         maturity: "L0" as MaturityLevel,
         displayPriority: inferDisplayPriority(item),
         sourceWeight: inferSourceWeight(item.sourceType, item.source),
       })),
     [],
   );
+  const officialCompetitorItems = evidenceWithMeta.filter((item) => isOfficialCompetitorEvidence(item)).slice(0, 5);
+  const userForumItems = evidenceWithMeta.filter((item) => isUserForumEvidence(item)).slice(0, 5);
   const priorityEvents = evidenceWithMeta
     .filter((item) => item.displayPriority === "P0" || item.displayPriority === "P1")
     .slice(0, 6);
@@ -821,7 +927,7 @@ export default function Home() {
       <div className="mx-auto grid max-w-7xl gap-5 px-5 py-5 lg:grid-cols-[220px_1fr]">
         <aside className="lg:sticky lg:top-5 lg:h-fit">
           <nav className="grid gap-2 rounded-md border border-zinc-200 bg-white p-2">
-            {["简报", "主题库", "证据库", "机会池", "信源状态", "规则模型", "反馈配置"].map((view) => (
+            {["简报", "主题库", "证据库", "机会池", "信源状态", "标签体系", "规则模型", "反馈配置"].map((view) => (
               <button
                 key={view}
                 onClick={() => setActiveView(view)}
@@ -926,16 +1032,23 @@ export default function Home() {
                       <article key={item.id} className="rounded-md border border-zinc-200 p-4">
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                           <div className="min-w-0">
-                            <div className="flex flex-wrap gap-2">
+                            <SourceTagRow
+                              tags={compactSourceTags({
+                                sourceType: sourceTypeFromBriefing(item),
+                                source: item.source,
+                                title: item.title,
+                                summary: item.summary,
+                                originalTitle: item.originalTitle,
+                                url: itemUrl,
+                              })}
+                            />
+                            <h3 className="mt-3 break-words text-lg font-semibold">{item.title}</h3>
+                            <p className="mt-2 max-w-3xl break-words text-sm leading-6 text-zinc-600">{item.summary}</p>
+                            <div className="mt-3 flex flex-wrap gap-2">
                               <Badge className="border-zinc-200 bg-zinc-50 text-zinc-700">{item.type}</Badge>
                               <Badge className={trendStyles[item.trend]}>{item.trend}</Badge>
                               <Badge className={displayPriorityStyles[displayPriority]}>{displayPriority}</Badge>
-                              <span className={`inline-flex h-7 items-center rounded-full px-3 text-xs font-semibold ${priorityStyles[item.priority]}`}>
-                                {item.priority}优先级
-                              </span>
                             </div>
-                            <h3 className="mt-3 break-words text-lg font-semibold">{item.title}</h3>
-                            <p className="mt-2 max-w-3xl break-words text-sm leading-6 text-zinc-600">{item.summary}</p>
                             <SourceDisclosure url={itemUrl} originalTitle={item.originalTitle} className="mt-3" />
                           </div>
                           <div className="grid min-w-36 gap-1 text-sm text-zinc-500">
@@ -952,18 +1065,77 @@ export default function Home() {
 
               <section className="grid gap-5 xl:grid-cols-2">
                 <div className="rounded-md border border-zinc-200 bg-white p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-semibold">竞品官方信源</h2>
+                      <p className="mt-1 text-sm text-zinc-500">只看官网、价格页、官方账号等由竞品直接发布的信息</p>
+                    </div>
+                    <span className="rounded bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-600">{officialCompetitorItems.length} 条</span>
+                  </div>
+                  <div className="mt-5 grid gap-3">
+                    {officialCompetitorItems.map((item) => (
+                      <article key={item.id} className="rounded-md border border-zinc-200 p-4">
+                        <SourceTagRow tags={item.sourceTags} />
+                        <h3 className="mt-3 break-words text-sm font-semibold">{item.title}</h3>
+                        <p className="mt-2 break-words text-xs leading-5 text-zinc-500">{item.summary}</p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                          <span>{item.source}</span>
+                          <span>{item.time}</span>
+                        </div>
+                        <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-3" />
+                      </article>
+                    ))}
+                    {officialCompetitorItems.length === 0 && (
+                      <div className="rounded-md border border-dashed border-zinc-200 p-6 text-sm text-zinc-500">
+                        今日暂无竞品官方信源信息
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-md border border-zinc-200 bg-white p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-semibold">用户论坛声音</h2>
+                      <p className="mt-1 text-sm text-zinc-500">只看 Reddit、论坛、社区等用户主动发布的需求和限制反馈</p>
+                    </div>
+                    <span className="rounded bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-600">{userForumItems.length} 条</span>
+                  </div>
+                  <div className="mt-5 grid gap-3">
+                    {userForumItems.map((item) => (
+                      <article key={item.id} className="rounded-md border border-zinc-200 p-4">
+                        <SourceTagRow tags={item.sourceTags} />
+                        <h3 className="mt-3 break-words text-sm font-semibold">{item.title}</h3>
+                        <p className="mt-2 break-words text-xs leading-5 text-zinc-500">{item.summary}</p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                          <span>{item.source}</span>
+                          <span>{item.time}</span>
+                        </div>
+                        <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-3" />
+                      </article>
+                    ))}
+                    {userForumItems.length === 0 && (
+                      <div className="rounded-md border border-dashed border-zinc-200 p-6 text-sm text-zinc-500">
+                        今日暂无用户论坛声音
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              <section className="grid gap-5 xl:grid-cols-2">
+                <div className="rounded-md border border-zinc-200 bg-white p-5">
                   <h2 className="text-xl font-semibold">重点事件池</h2>
                   <div className="mt-5 grid gap-3">
                     {priorityEvents.map((item) => (
                       <article key={item.id} className="rounded-md border border-zinc-200 p-4">
-                        <div className="flex flex-wrap gap-2">
-                          <Badge className={maturityStyles[item.maturity]}>{item.maturity}</Badge>
-                          <Badge className={displayPriorityStyles[item.displayPriority]}>{item.displayPriority}</Badge>
-                          <Badge className="border-zinc-200 bg-zinc-50 text-zinc-700">{item.sourceCategory}</Badge>
-                          <Badge className="border-zinc-200 bg-white text-zinc-600">来源权重 {item.sourceWeight}</Badge>
-                        </div>
+                        <SourceTagRow tags={item.sourceTags} />
                         <h3 className="mt-3 break-words text-sm font-semibold">{item.title}</h3>
                         <p className="mt-2 break-words text-xs leading-5 text-zinc-500">{item.summary}</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Badge className={displayPriorityStyles[item.displayPriority]}>{item.displayPriority}</Badge>
+                          <Badge className={maturityStyles[item.maturity]}>{item.maturity}</Badge>
+                        </div>
                         <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-3" />
                       </article>
                     ))}
@@ -1154,10 +1326,8 @@ export default function Home() {
                               <div className="mt-2 grid gap-2">
                                 {themeEvidence.slice(0, 3).map((item) => (
                                   <div key={item.id} className="rounded bg-white/70 p-2">
-                                    <p className="break-words text-xs leading-5 text-zinc-700">{item.title}</p>
-                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                                      <span>{item.sourceType} · {item.source}</span>
-                                    </div>
+                                    <SourceTagRow tags={compactSourceTags(item)} />
+                                    <p className="mt-2 break-words text-xs leading-5 text-zinc-700">{item.title}</p>
                                     <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-1" />
                                   </div>
                                 ))}
@@ -1349,10 +1519,8 @@ export default function Home() {
                     <div className="mt-3 grid gap-3">
                       {selectedEvidence.filter((item) => item.role === "核心证据").map((item) => (
                         <div key={item.id} className="rounded bg-zinc-50 p-3">
-                          <p className="break-words text-sm leading-6 text-zinc-700">{item.title}</p>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                            <span>{item.sourceType} · {item.source}</span>
-                          </div>
+                          <SourceTagRow tags={compactSourceTags(item)} />
+                          <p className="mt-2 break-words text-sm leading-6 text-zinc-700">{item.title}</p>
                           <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-1" />
                         </div>
                       ))}
@@ -1363,10 +1531,8 @@ export default function Home() {
                     <div className="mt-3 grid gap-3">
                       {selectedEvidence.filter((item) => item.role === "参考信息").map((item) => (
                         <div key={item.id} className="rounded bg-zinc-50 p-3">
-                          <p className="break-words text-sm leading-6 text-zinc-700">{item.title}</p>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                            <span>{item.sourceType} · {item.source}</span>
-                          </div>
+                          <SourceTagRow tags={compactSourceTags(item)} />
+                          <p className="mt-2 break-words text-sm leading-6 text-zinc-700">{item.title}</p>
                           <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-1" />
                         </div>
                       ))}
@@ -1450,17 +1616,15 @@ export default function Home() {
                   <article key={item.id} className="rounded-md border border-zinc-200 p-4">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div className="min-w-0">
-                        <div className="flex flex-wrap gap-2">
+                        <SourceTagRow tags={item.sourceTags} />
+                        <h3 className="mt-3 break-words text-base font-semibold">{item.title}</h3>
+                        <p className="mt-2 break-words text-sm leading-6 text-zinc-600">{item.summary}</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
                           <Badge className={item.role === "核心证据" ? "border-teal-200 bg-teal-50 text-teal-700" : "border-zinc-200 bg-zinc-50 text-zinc-600"}>
                             {item.role}
                           </Badge>
-                          <Badge className={maturityStyles[item.maturity]}>{item.maturity}</Badge>
                           <Badge className={displayPriorityStyles[item.displayPriority]}>{item.displayPriority}</Badge>
-                          <Badge className="border-zinc-200 bg-white text-zinc-600">{item.sourceCategory}</Badge>
-                          <Badge className="border-zinc-200 bg-white text-zinc-600">来源权重 {item.sourceWeight}</Badge>
                         </div>
-                        <h3 className="mt-3 break-words text-base font-semibold">{item.title}</h3>
-                        <p className="mt-2 break-words text-sm leading-6 text-zinc-600">{item.summary}</p>
                         <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-3" />
                       </div>
                       <div className="min-w-36 text-sm text-zinc-500">
@@ -1513,6 +1677,61 @@ export default function Home() {
                 ))}
               </div>
             </section>
+          )}
+
+          {activeView === "标签体系" && (
+            <div className="grid gap-5">
+              <section className="rounded-md border border-zinc-200 bg-white p-5">
+                <h2 className="text-xl font-semibold">信源标签体系</h2>
+                <p className="mt-1 text-sm leading-6 text-zinc-500">
+                  信息卡上的标签只回答“这条信息从哪里来”，不直接代表优先级、成熟度或机会价值。每条信息最多展示 4 个信源标签。
+                </p>
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  {sourceTagDefinitions.map(([title, body]) => (
+                    <div key={title} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
+                      <p className="text-sm font-semibold">{title}</p>
+                      <p className="mt-2 text-xs leading-5 text-zinc-500">{body}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="grid gap-5 xl:grid-cols-2">
+                <div className="rounded-md border border-zinc-200 bg-white p-5">
+                  <h2 className="text-xl font-semibold">标签示例</h2>
+                  <div className="mt-5 grid gap-4">
+                    {[
+                      ["竞品官方信源", ["竞品情报", "官网/价格页", "Surfshark", "美国"], "说明这条信息来自竞品自己的可控阵地，适合观察其产品、定价、内容和品牌表达。"],
+                      ["用户论坛声音", ["用户声音", "论坛/社区", "Reddit", "德国"], "说明这条信息来自用户主动讨论，适合判断真实需求、限制原因和使用动机。"],
+                      ["搜索信号", ["SEO搜索", "搜索结果", "Google SERP", "英国"], "说明这条信息来自搜索结果或关键词监控，适合观察流量竞争和内容入口。"],
+                    ].map(([title, tags, body]) => (
+                      <div key={title as string} className="rounded-md border border-zinc-200 p-4">
+                        <SourceTagRow tags={tags as string[]} />
+                        <p className="mt-3 text-sm font-semibold">{title}</p>
+                        <p className="mt-2 text-xs leading-5 text-zinc-500">{body}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-md border border-zinc-200 bg-white p-5">
+                  <h2 className="text-xl font-semibold">使用原则</h2>
+                  <div className="mt-5 grid gap-3">
+                    {[
+                      ["少量", "同一条信息不堆叠过多标签，优先保留能帮助运营判断来源的字段。"],
+                      ["稳定", "标签不随系统评分频繁变化，避免今天叫机会、明天叫风险。"],
+                      ["可追溯", "标签必须能回到具体信源或信息内容，不能凭主观感觉添加。"],
+                      ["和评级分离", "P0-P3、L0-L5 是判断标签；信源标签只说明来源，不说明好坏。"],
+                    ].map(([title, body]) => (
+                      <div key={title} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
+                        <p className="text-sm font-semibold">{title}</p>
+                        <p className="mt-2 text-xs leading-5 text-zinc-500">{body}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            </div>
           )}
 
           {activeView === "规则模型" && (

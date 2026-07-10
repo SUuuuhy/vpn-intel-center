@@ -560,6 +560,39 @@
       "summary": "套餐页新增家庭场景表达，与折扣活动共同构成竞品动作证据。",
       "time": "2026-07-09 16:30",
       "url": "https://surfshark.com/pricing"
+    },
+    {
+      "id": "e6",
+      "role": "核心证据",
+      "themeId": "a3",
+      "title": "ExpressVPN 官方 YouTube 更新流媒体访问内容",
+      "sourceType": "竞品情报",
+      "source": "ExpressVPN YouTube",
+      "summary": "官方账号继续围绕流媒体访问、跨区观看和设备使用场景做内容表达，可作为竞品内容选题方向的参考。",
+      "time": "2026-07-08 11:20",
+      "url": "https://www.youtube.com/results?search_query=ExpressVPN+streaming+VPN"
+    },
+    {
+      "id": "e7",
+      "role": "核心证据",
+      "themeId": "d2",
+      "title": "Reddit 讨论：德国用户跨区订阅美国流媒体遇到支付限制",
+      "sourceType": "用户声音",
+      "source": "Reddit",
+      "summary": "用户讨论集中在账号地区、支付方式和账单地址限制，需求指向跨区订阅与访问稳定性。",
+      "time": "2026-07-09 20:10",
+      "url": "https://www.reddit.com/search/?q=Germany%20US%20streaming%20payment%20region%20VPN"
+    },
+    {
+      "id": "e8",
+      "role": "参考信息",
+      "themeId": "d3",
+      "title": "Reddit 讨论：公共 Wi-Fi 下的隐私和安全担忧",
+      "sourceType": "用户声音",
+      "source": "Reddit",
+      "summary": "用户在公共网络环境下讨论隐私保护和连接安全，但暂未形成明确的平台访问限制，因此作为参考信息保留。",
+      "time": "2026-07-08 14:30",
+      "url": "https://www.reddit.com/search/?q=public%20wifi%20privacy%20VPN"
     }
   ],
   "themeRelations": [
