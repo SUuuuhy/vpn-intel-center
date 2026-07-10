@@ -515,7 +515,13 @@
       "source": "Reddit",
       "summary": "用户明确表达在美国访问 BBC iPlayer 失败，并询问可用英国节点。",
       "time": "2026-07-10 09:20",
-      "url": "https://www.reddit.com/search/?q=Reddit%20%E8%AE%A8%E8%AE%BA%EF%BC%9A%E7%BE%8E%E5%9B%BD%E7%94%A8%E6%88%B7%E8%AF%A2%E9%97%AE%20BBC%20iPlayer%20%E5%8F%AF%E7%94%A8%20VPN"
+      "url": "https://www.reddit.com/search/?q=Reddit%20%E8%AE%A8%E8%AE%BA%EF%BC%9A%E7%BE%8E%E5%9B%BD%E7%94%A8%E6%88%B7%E8%AF%A2%E9%97%AE%20BBC%20iPlayer%20%E5%8F%AF%E7%94%A8%20VPN",
+      "userMarket": "美国",
+      "targetMarket": "英国",
+      "platformObject": "BBC iPlayer",
+      "rawNeed": "我在美国想看 BBC iPlayer，但地区限制挡住了，需要知道哪个 VPN/英国节点还能用。",
+      "discussionHeat": "中",
+      "reviewStatus": "待确认"
     },
     {
       "id": "e2",
@@ -537,7 +543,10 @@
       "source": "NordVPN",
       "summary": "页面标题、教程结构和英国节点说明出现更新，匹配动作型主题。",
       "time": "2026-07-10 08:40",
-      "url": "https://www.google.com/search?q=site%3Anordvpn.com%20NordVPN%20%E6%9B%B4%E6%96%B0%20BBC%20iPlayer%20%E6%95%99%E7%A8%8B%E9%A1%B5"
+      "url": "https://www.google.com/search?q=site%3Anordvpn.com%20NordVPN%20%E6%9B%B4%E6%96%B0%20BBC%20iPlayer%20%E6%95%99%E7%A8%8B%E9%A1%B5",
+      "targetMarket": "英国",
+      "platformObject": "BBC iPlayer",
+      "reviewStatus": "待确认"
     },
     {
       "id": "e4",
@@ -559,7 +568,9 @@
       "source": "Surfshark pricing",
       "summary": "套餐页新增家庭场景表达，与折扣活动共同构成竞品动作证据。",
       "time": "2026-07-09 16:30",
-      "url": "https://surfshark.com/pricing"
+      "url": "https://surfshark.com/pricing",
+      "platformObject": "定价页",
+      "reviewStatus": "系统建议"
     },
     {
       "id": "e6",
@@ -570,7 +581,9 @@
       "source": "ExpressVPN YouTube",
       "summary": "官方账号继续围绕流媒体访问、跨区观看和设备使用场景做内容表达，可作为竞品内容选题方向的参考。",
       "time": "2026-07-08 11:20",
-      "url": "https://www.youtube.com/results?search_query=ExpressVPN+streaming+VPN"
+      "url": "https://www.youtube.com/@ExpressVPN",
+      "platformObject": "YouTube",
+      "reviewStatus": "系统建议"
     },
     {
       "id": "e7",
@@ -581,7 +594,13 @@
       "source": "Reddit",
       "summary": "用户讨论集中在账号地区、支付方式和账单地址限制，需求指向跨区订阅与访问稳定性。",
       "time": "2026-07-09 20:10",
-      "url": "https://www.reddit.com/search/?q=Germany%20US%20streaming%20payment%20region%20VPN"
+      "url": "https://www.reddit.com/search/?q=Germany%20US%20streaming%20payment%20region%20VPN",
+      "userMarket": "德国",
+      "targetMarket": "美国",
+      "platformObject": "美国流媒体",
+      "rawNeed": "我人在德国，想订阅美国流媒体，但支付方式和账单地址不匹配。",
+      "discussionHeat": "中",
+      "reviewStatus": "待确认"
     },
     {
       "id": "e8",
@@ -592,7 +611,12 @@
       "source": "Reddit",
       "summary": "用户在公共网络环境下讨论隐私保护和连接安全，但暂未形成明确的平台访问限制，因此作为参考信息保留。",
       "time": "2026-07-08 14:30",
-      "url": "https://www.reddit.com/search/?q=public%20wifi%20privacy%20VPN"
+      "url": "https://www.reddit.com/search/?q=public%20wifi%20privacy%20VPN",
+      "userMarket": "英国",
+      "platformObject": "公共 Wi-Fi",
+      "rawNeed": "我经常用公共 Wi-Fi，担心浏览隐私和连接安全，想知道 VPN 是否必要。",
+      "discussionHeat": "低",
+      "reviewStatus": "待确认"
     }
   ],
   "themeRelations": [
