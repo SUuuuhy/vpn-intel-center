@@ -241,6 +241,7 @@ function buildChineseTitle(rawTitle, source, themeId) {
   if (source.category === "SEO搜索") return `SEO 信号：${subject}${suffix}`;
   if (source.category === "第三方媒体") return `第三方评测：${subject}${suffix}`;
   if (source.category === "相关平台") return `平台生态：${subject}${suffix}`;
+  if (source.category === "需求触发市场") return `需求对象：${subject}${suffix}`;
   return `${source.category || "外部情报"}：${subject}${suffix}`;
 }
 
@@ -264,6 +265,9 @@ function buildChineseSummary(rawTitle, rawSummary, source, themeId, role) {
   }
   if (source.category === "SEO搜索") {
     return `该信息来自${sourceName}${publisherText}，说明「${subject}」相关搜索结果出现变化。系统将其标记为${role}，用于观察需求热度、竞品页面布局和潜在 SEO 切入点。原文标题：${originalTitle}。`;
+  }
+  if (source.category === "需求触发市场") {
+    return `该信息来自${sourceName}${publisherText}，指向「${subject}」这一需求触发对象。系统将其标记为${role}，用于判断高人气内容、赛事或平台是否因为地区限制、版权差异或访问门槛触发 VPN 使用需求。原文标题：${originalTitle}。`;
   }
 
   return `该信息来自${sourceName}${publisherText}，与「${subject}」相关。系统将其标记为${role}，用于辅助增长和运营判断外部市场变化。原文标题：${originalTitle}。`;

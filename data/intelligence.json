@@ -46,10 +46,10 @@
       "color": "bg-rose-500"
     },
     {
-      "name": "平台服务生态",
+      "name": "需求触发市场",
       "total": 109,
       "active": 88,
-      "freq": "按平台分频",
+      "freq": "按对象分频",
       "color": "bg-emerald-500"
     }
   ],
