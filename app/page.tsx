@@ -476,6 +476,45 @@ function SegmentedButtons<T extends string>({
   );
 }
 
+function SourceDisclosure({
+  url,
+  originalTitle,
+  className = "",
+}: {
+  url?: string;
+  originalTitle?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (!url) return null;
+
+  return (
+    <div className={`min-w-0 ${className}`}>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className="inline-flex text-sm font-semibold text-teal-700 hover:text-teal-900"
+      >
+        {open ? "收起来源" : "查看来源"}
+      </button>
+      {open && (
+        <div className="mt-2 max-w-full rounded-md border border-zinc-200 bg-white p-3 text-xs leading-5 text-zinc-600">
+          {originalTitle && (
+            <p className="mb-2 break-words">
+              <span className="font-semibold text-zinc-700">原始标题：</span>
+              {originalTitle}
+            </p>
+          )}
+          <p className="font-semibold text-zinc-700">原链接：</p>
+          <p className="mt-1 break-all font-mono text-[11px] leading-5 text-zinc-600">{url}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const [briefingPeriod, setBriefingPeriod] = useState<"daily" | "weekly">("daily");
   const [activeView, setActiveView] = useState("简报");
@@ -519,7 +558,18 @@ export default function Home() {
   );
   const selectedOpportunities = intelligence.opportunities.filter((opportunity) => opportunity.themeId === selectedTheme.id);
   const sourceUrlByTitle = useMemo(
-    () => new Map(intelligence.evidence.filter((item) => item.url).map((item) => [item.title, item.url])),
+    () =>
+      new Map(
+        intelligence.evidence.flatMap((item): [string, string][] => {
+          if (!item.url) return [];
+          return item.originalTitle
+            ? [
+                [item.title, item.url],
+                [item.originalTitle, item.url],
+              ]
+            : [[item.title, item.url]];
+        }),
+      ),
     [],
   );
   const selectedManualReview = {
@@ -675,16 +725,7 @@ export default function Home() {
                             </div>
                             <h3 className="mt-3 break-words text-lg font-semibold">{item.title}</h3>
                             <p className="mt-2 max-w-3xl break-words text-sm leading-6 text-zinc-600">{item.summary}</p>
-                            {itemUrl && (
-                              <a
-                                href={itemUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="mt-3 inline-flex text-sm font-semibold text-teal-700 hover:text-teal-900"
-                              >
-                                查看来源
-                              </a>
-                            )}
+                            <SourceDisclosure url={itemUrl} originalTitle={item.originalTitle} className="mt-3" />
                           </div>
                           <div className="grid min-w-36 gap-1 text-sm text-zinc-500">
                             <span>{item.source}</span>
@@ -811,17 +852,8 @@ export default function Home() {
                                     <p className="break-words text-xs leading-5 text-zinc-700">{item.title}</p>
                                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
                                       <span>{item.sourceType} · {item.source}</span>
-                                      {item.url && (
-                                        <a
-                                          href={item.url}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="font-semibold text-teal-700 hover:text-teal-900"
-                                        >
-                                          查看来源
-                                        </a>
-                                      )}
                                     </div>
+                                    <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-1" />
                                   </div>
                                 ))}
                                 {themeEvidence.length === 0 && <p className="text-xs text-zinc-500">暂无证据</p>}
@@ -993,17 +1025,8 @@ export default function Home() {
                           <p className="break-words text-sm leading-6 text-zinc-700">{item.title}</p>
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
                             <span>{item.sourceType} · {item.source}</span>
-                            {item.url && (
-                              <a
-                                href={item.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="font-semibold text-teal-700 hover:text-teal-900"
-                              >
-                                查看来源
-                              </a>
-                            )}
                           </div>
+                          <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-1" />
                         </div>
                       ))}
                     </div>
@@ -1016,17 +1039,8 @@ export default function Home() {
                           <p className="break-words text-sm leading-6 text-zinc-700">{item.title}</p>
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
                             <span>{item.sourceType} · {item.source}</span>
-                            {item.url && (
-                              <a
-                                href={item.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="font-semibold text-teal-700 hover:text-teal-900"
-                              >
-                                查看来源
-                              </a>
-                            )}
                           </div>
+                          <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-1" />
                         </div>
                       ))}
                       {selectedEvidence.filter((item) => item.role === "参考信息").length === 0 && (
@@ -1091,16 +1105,7 @@ export default function Home() {
                         </div>
                         <h3 className="mt-3 break-words text-base font-semibold">{item.title}</h3>
                         <p className="mt-2 break-words text-sm leading-6 text-zinc-600">{item.summary}</p>
-                        {item.url && (
-                          <a
-                            href={item.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="mt-3 inline-flex text-sm font-semibold text-teal-700 hover:text-teal-900"
-                          >
-                            查看来源
-                          </a>
-                        )}
+                        <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-3" />
                       </div>
                       <div className="min-w-36 text-sm text-zinc-500">
                         <p>{item.source}</p>
