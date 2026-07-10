@@ -1,23 +1,95 @@
 {
-  "generatedAt": "2026-07-10T09:20:00+08:00",
+  "generatedAt": "2026-07-10T07:38:59.778Z",
   "displayDate": "2026-07-10",
   "status": {
     "newItemsToday": 19,
-    "highPriorityToday": 3,
+    "highPriorityToday": 9,
     "pendingReview": 4,
-    "normalSourceRate": 92,
-    "sourcesWaitingReview": 17,
+    "normalSourceRate": 100,
+    "sourcesWaitingReview": 0,
     "manualCorrections": 2
   },
   "sourceStats": [
-    { "name": "竞品情报", "total": 116, "active": 101, "freq": "按页/账号分频", "color": "bg-teal-500" },
-    { "name": "用户声音", "total": 77, "active": 66, "freq": "每日", "color": "bg-indigo-500" },
-    { "name": "SEO搜索", "total": 42, "active": 38, "freq": "每周2-3次", "color": "bg-cyan-500" },
-    { "name": "第三方媒体", "total": 71, "active": 58, "freq": "每周1-2次", "color": "bg-amber-500" },
-    { "name": "政策监管", "total": 57, "active": 49, "freq": "每周/事件加频", "color": "bg-rose-500" },
-    { "name": "平台服务生态", "total": 109, "active": 88, "freq": "按平台分频", "color": "bg-emerald-500" }
+    {
+      "name": "竞品情报",
+      "total": 116,
+      "active": 101,
+      "freq": "按页/账号分频",
+      "color": "bg-teal-500"
+    },
+    {
+      "name": "用户声音",
+      "total": 77,
+      "active": 66,
+      "freq": "每日",
+      "color": "bg-indigo-500"
+    },
+    {
+      "name": "SEO搜索",
+      "total": 42,
+      "active": 38,
+      "freq": "每周2-3次",
+      "color": "bg-cyan-500"
+    },
+    {
+      "name": "第三方媒体",
+      "total": 71,
+      "active": 58,
+      "freq": "每周1-2次",
+      "color": "bg-amber-500"
+    },
+    {
+      "name": "政策监管",
+      "total": 57,
+      "active": 49,
+      "freq": "每周/事件加频",
+      "color": "bg-rose-500"
+    },
+    {
+      "name": "平台服务生态",
+      "total": 109,
+      "active": 88,
+      "freq": "按平台分频",
+      "color": "bg-emerald-500"
+    }
   ],
   "briefingItems": [
+    {
+      "id": "auto-2026-07-10-1",
+      "period": "daily",
+      "type": "竞品动作",
+      "title": "NordVPN expands scam text protection to all Android users worldwide - TechRadar",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMirwFBVV95cUxPUWhudjJZNmgxVUhGczBUTnRHWnJkblZCQTRrWFdSSVhSa0h2RkFvZGJobWY0VkFIOVdfTHZ3dWpTZUliM0RNdDVyOTdkR2NaRjFmcU9PRXpPd1JDbnYtdXBJYjhiemJYUjctOXhsN0RNQXlsUGFPWkpCRGQxX1hsNXJCTzV5OGlGOUFuQVlKRlVqaHRHRTg5Q05DU05ZMzJQakdMeDBsMWhoWWpjd01J?oc=5\" target=\"_blank\">NordVPN expands scam text protection to all Android users worldwide</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">TechRadar</font>",
+      "priority": "高",
+      "trend": "新出现",
+      "evidence": 1,
+      "source": "Google News - VPN Competitors",
+      "time": "2026-07-09 21:00"
+    },
+    {
+      "id": "auto-2026-07-10-2",
+      "period": "daily",
+      "type": "竞品动作",
+      "title": "Stay Safe Online and Save Up to 86% With This Surfshark VPN Deal, Starting at Just $2.39 a Month - PCMag",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMinwFBVV95cUxNcW9jN3JyR2lISXpGZ3Z2QlF1MEZUNmtucEdpTXNCdzVkSWZlY2tWOVNyVExfOWFYNWFBVGxsWlNwWkh1c1NvSUJVdEhLSVNiVFVwZEptNnZ5YTlPQUdhOXpPRDRZaldQNmNfeDhoUXc5WmZCaWh3S2Zad0k4RE83TXBUcW1FVm5ETjMtbm5XaWNnNTBIZUJ4VlZTZEJWZTQ?oc=5\" target=\"_blank\">Stay Safe Online and Save Up to 86% With This Surfshark VPN Deal, Starting at Just $2.39 a Month</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">PCMag</font>",
+      "priority": "高",
+      "trend": "新出现",
+      "evidence": 1,
+      "source": "Google News - VPN Competitors",
+      "time": "2026-07-07 21:28"
+    },
+    {
+      "id": "auto-2026-07-10-3",
+      "period": "daily",
+      "type": "竞品动作",
+      "title": "ExpressVPN becomes the first VPN to sponsor the World Cup - qz.com",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMiVkFVX3lxTFBfcno1NDhYTGY5Yy1xMFlQblp2YmdrTnJZWDAxZHJwWXpIQzljeGhHSU13QnBreUVWcFo3dm1PN2toTzBnejU1SXNwa2k5aTkxZEV2eVNn?oc=5\" target=\"_blank\">ExpressVPN becomes the first VPN to sponsor the World Cup</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">qz.com</font>",
+      "priority": "高",
+      "trend": "新出现",
+      "evidence": 1,
+      "source": "Google News - VPN Competitors",
+      "time": "2026-07-07 06:10"
+    },
     {
       "id": "b1",
       "period": "daily",
@@ -197,6 +269,215 @@
   ],
   "evidence": [
     {
+      "id": "auto-c827b5f950f8",
+      "role": "核心证据",
+      "themeId": "a1",
+      "title": "NordVPN expands scam text protection to all Android users worldwide - TechRadar",
+      "sourceType": "竞品情报",
+      "source": "Google News - VPN Competitors",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMirwFBVV95cUxPUWhudjJZNmgxVUhGczBUTnRHWnJkblZCQTRrWFdSSVhSa0h2RkFvZGJobWY0VkFIOVdfTHZ3dWpTZUliM0RNdDVyOTdkR2NaRjFmcU9PRXpPd1JDbnYtdXBJYjhiemJYUjctOXhsN0RNQXlsUGFPWkpCRGQxX1hsNXJCTzV5OGlGOUFuQVlKRlVqaHRHRTg5Q05DU05ZMzJQakdMeDBsMWhoWWpjd01J?oc=5\" target=\"_blank\">NordVPN expands scam text protection to all Android users worldwide</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">TechRadar</font>",
+      "time": "2026-07-09 21:00",
+      "url": "https://news.google.com/rss/articles/CBMirwFBVV95cUxPUWhudjJZNmgxVUhGczBUTnRHWnJkblZCQTRrWFdSSVhSa0h2RkFvZGJobWY0VkFIOVdfTHZ3dWpTZUliM0RNdDVyOTdkR2NaRjFmcU9PRXpPd1JDbnYtdXBJYjhiemJYUjctOXhsN0RNQXlsUGFPWkpCRGQxX1hsNXJCTzV5OGlGOUFuQVlKRlVqaHRHRTg5Q05DU05ZMzJQakdMeDBsMWhoWWpjd01J?oc=5"
+    },
+    {
+      "id": "auto-cb037dba4e4d",
+      "role": "参考信息",
+      "themeId": "a1",
+      "title": "How to watch 2026 World Cup games for less with a VPN - Yahoo Tech",
+      "sourceType": "竞品情报",
+      "source": "Google News - VPN Competitors",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMitgFBVV95cUxQTjNxc0p3QmRnTE93X1Q2OW1iWFplZDd3WWFPeVpLVFAxUDQyYzZCaXF2RFAzWDRiSXRkbGloZkhUN3BrN1dqSEhCNzNYZllOcHF2VW03SW5tZDZVekZmTU5OTVNBWnhrRURVOTBaMUJOSGtqRkRfR056Y3BkRnZZeHprcXJUOWpXQ0FqMURvUDFmMm8tRFNQWWJVY3BhcjVNOXNHUmppdmZXZUFuQWZrLU1FOGZfdw?oc=5\" target=\"_blank\">How to watch 2026 World Cup games for less with a VPN</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">Yahoo Tech</font>",
+      "time": "2026-07-09 18:16",
+      "url": "https://news.google.com/rss/articles/CBMitgFBVV95cUxQTjNxc0p3QmRnTE93X1Q2OW1iWFplZDd3WWFPeVpLVFAxUDQyYzZCaXF2RFAzWDRiSXRkbGloZkhUN3BrN1dqSEhCNzNYZllOcHF2VW03SW5tZDZVekZmTU5OTVNBWnhrRURVOTBaMUJOSGtqRkRfR056Y3BkRnZZeHprcXJUOWpXQ0FqMURvUDFmMm8tRFNQWWJVY3BhcjVNOXNHUmppdmZXZUFuQWZrLU1FOGZfdw?oc=5"
+    },
+    {
+      "id": "auto-4824a4cc8666",
+      "role": "核心证据",
+      "themeId": "a2",
+      "title": "Stay Safe Online and Save Up to 86% With This Surfshark VPN Deal, Starting at Just $2.39 a Month - PCMag",
+      "sourceType": "竞品情报",
+      "source": "Google News - VPN Competitors",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMinwFBVV95cUxNcW9jN3JyR2lISXpGZ3Z2QlF1MEZUNmtucEdpTXNCdzVkSWZlY2tWOVNyVExfOWFYNWFBVGxsWlNwWkh1c1NvSUJVdEhLSVNiVFVwZEptNnZ5YTlPQUdhOXpPRDRZaldQNmNfeDhoUXc5WmZCaWh3S2Zad0k4RE83TXBUcW1FVm5ETjMtbm5XaWNnNTBIZUJ4VlZTZEJWZTQ?oc=5\" target=\"_blank\">Stay Safe Online and Save Up to 86% With This Surfshark VPN Deal, Starting at Just $2.39 a Month</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">PCMag</font>",
+      "time": "2026-07-07 21:28",
+      "url": "https://news.google.com/rss/articles/CBMinwFBVV95cUxNcW9jN3JyR2lISXpGZ3Z2QlF1MEZUNmtucEdpTXNCdzVkSWZlY2tWOVNyVExfOWFYNWFBVGxsWlNwWkh1c1NvSUJVdEhLSVNiVFVwZEptNnZ5YTlPQUdhOXpPRDRZaldQNmNfeDhoUXc5WmZCaWh3S2Zad0k4RE83TXBUcW1FVm5ETjMtbm5XaWNnNTBIZUJ4VlZTZEJWZTQ?oc=5"
+    },
+    {
+      "id": "auto-7301e03e989c",
+      "role": "参考信息",
+      "themeId": "a2",
+      "title": "Protect Your Privacy Online and Get Surfshark Starter for $2.39 a Month for 2 Years - CNET",
+      "sourceType": "竞品情报",
+      "source": "Google News - VPN Competitors",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMiZkFVX3lxTFBiUVQyU0dMS056eEtwdmlMOXpnb295ZnZMcTloZE5RR3pmSGlIMDhLcDMzOF9DaEp4MlV1dGF3bXV5TnBwbXRIRmw2ZTRndEdIOTVNYUpQNUtTd0podjNwLURvWUV1QQ?oc=5\" target=\"_blank\">Protect Your Privacy Online and Get Surfshark Starter for $2.39 a Month for 2 Years</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">CNET</font>",
+      "time": "2026-07-08 16:02",
+      "url": "https://news.google.com/rss/articles/CBMiZkFVX3lxTFBiUVQyU0dMS056eEtwdmlMOXpnb295ZnZMcTloZE5RR3pmSGlIMDhLcDMzOF9DaEp4MlV1dGF3bXV5TnBwbXRIRmw2ZTRndEdIOTVNYUpQNUtTd0podjNwLURvWUV1QQ?oc=5"
+    },
+    {
+      "id": "auto-72fd27a306ac",
+      "role": "核心证据",
+      "themeId": "a3",
+      "title": "ExpressVPN becomes the first VPN to sponsor the World Cup - qz.com",
+      "sourceType": "竞品情报",
+      "source": "Google News - VPN Competitors",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMiVkFVX3lxTFBfcno1NDhYTGY5Yy1xMFlQblp2YmdrTnJZWDAxZHJwWXpIQzljeGhHSU13QnBreUVWcFo3dm1PN2toTzBnejU1SXNwa2k5aTkxZEV2eVNn?oc=5\" target=\"_blank\">ExpressVPN becomes the first VPN to sponsor the World Cup</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">qz.com</font>",
+      "time": "2026-07-07 06:10",
+      "url": "https://news.google.com/rss/articles/CBMiVkFVX3lxTFBfcno1NDhYTGY5Yy1xMFlQblp2YmdrTnJZWDAxZHJwWXpIQzljeGhHSU13QnBreUVWcFo3dm1PN2toTzBnejU1SXNwa2k5aTkxZEV2eVNn?oc=5"
+    },
+    {
+      "id": "auto-53b7582bc139",
+      "role": "核心证据",
+      "themeId": "a3",
+      "title": "ExpressVPN Gives Users More Local VPN Choice With 214 Server Locations Worldwide - Scoop - New Zealand News",
+      "sourceType": "竞品情报",
+      "source": "Google News - VPN Competitors",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMivgFBVV95cUxQbmVHY2tsOGcyTHQyVVlsZHZsT1BTOVlZcEQ5SUZyVkJFLXVMRnpWdktaQ05na3p5TXE3N1RmN3FmMElxSEh5eDBKSEhIVHlGWFU4cVNqZ200U29zOExBa2U1ZXQ1bjlwSVpNd21hR1dydGEwMmo5NUNOM2Npdzh3anVIWlBsVUhxUF9hNVMwMml3OGp3X0dtaXFvYWRWSU0wQjByaTZnQzdXZGVoanhrQWhDZzM2NmgwS2x1Vk93?oc=5\" target=\"_blank\">ExpressVPN Gives Users More Local VPN Choice With 214 Server Locations Worldwide</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">Scoop - New Zealand News</font>",
+      "time": "2026-07-10 04:14",
+      "url": "https://news.google.com/rss/articles/CBMivgFBVV95cUxQbmVHY2tsOGcyTHQyVVlsZHZsT1BTOVlZcEQ5SUZyVkJFLXVMRnpWdktaQ05na3p5TXE3N1RmN3FmMElxSEh5eDBKSEhIVHlGWFU4cVNqZ200U29zOExBa2U1ZXQ1bjlwSVpNd21hR1dydGEwMmo5NUNOM2Npdzh3anVIWlBsVUhxUF9hNVMwMml3OGp3X0dtaXFvYWRWSU0wQjByaTZnQzdXZGVoanhrQWhDZzM2NmgwS2x1Vk93?oc=5"
+    },
+    {
+      "id": "auto-d2d1b0bf95cd",
+      "role": "核心证据",
+      "themeId": "a3",
+      "title": "How to purchase ExpressVPN in-app and set up your account - ExpressVPN",
+      "sourceType": "竞品情报",
+      "source": "Google News - VPN Competitors",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMigwFBVV95cUxOdDdNX0x0V2k2UUVlWUVqNjNQdEJ5OXY1RExBZTJTa25xNHAzaFRUMVk2ZnNEZzVYLXItSXRjdkQtRjFXTkIwUE9LREllU1FVajJMTUxfWGE5elpSRTM2WkliajlKX3A4N0czTWhIWmhTbDlVTXROOUV4eWU5SnBJNk9Iaw?oc=5\" target=\"_blank\">How to purchase ExpressVPN in-app and set up your account</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">ExpressVPN</font>",
+      "time": "2026-06-23 15:00",
+      "url": "https://news.google.com/rss/articles/CBMigwFBVV95cUxOdDdNX0x0V2k2UUVlWUVqNjNQdEJ5OXY1RExBZTJTa25xNHAzaFRUMVk2ZnNEZzVYLXItSXRjdkQtRjFXTkIwUE9LREllU1FVajJMTUxfWGE5elpSRTM2WkliajlKX3A4N0czTWhIWmhTbDlVTXROOUV4eWU5SnBJNk9Iaw?oc=5"
+    },
+    {
+      "id": "auto-6abb2cf70226",
+      "role": "核心证据",
+      "themeId": "a2",
+      "title": "Surfshark vs IPVanish: Our expert compares the VPN providers - The Independent",
+      "sourceType": "竞品情报",
+      "source": "Google News - VPN Competitors",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMinwFBVV95cUxQME9rMFhwZUpFS2VSVjd0aXFOOUhYZEZLSG5UQXE0eDRyMTJKeEs5aHhyUlpNM1Jvd21vU0NTTWpSY2t6aUhmcDRwX3gtT3ZZbVZtZ05zSVFZczFoYVRETzZQcldld0lkWWJLQVF2enVFOWhHTVlaVElSSWpZX3hkSDZrRmxWc19jalZMeWJYRWRHSTRkT2RvZGExSmw5Znc?oc=5\" target=\"_blank\">Surfshark vs IPVanish: Our expert compares the VPN providers</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">The Independent</font>",
+      "time": "2026-07-07 22:19",
+      "url": "https://news.google.com/rss/articles/CBMinwFBVV95cUxQME9rMFhwZUpFS2VSVjd0aXFOOUhYZEZLSG5UQXE0eDRyMTJKeEs5aHhyUlpNM1Jvd21vU0NTTWpSY2t6aUhmcDRwX3gtT3ZZbVZtZ05zSVFZczFoYVRETzZQcldld0lkWWJLQVF2enVFOWhHTVlaVElSSWpZX3hkSDZrRmxWc19jalZMeWJYRWRHSTRkT2RvZGExSmw5Znc?oc=5"
+    },
+    {
+      "id": "auto-1e2c229cba19",
+      "role": "参考信息",
+      "themeId": "d1",
+      "title": "BBC iPlayer VPN: Best Picks That Still Work in 2026 - TheBestVPN.com",
+      "sourceType": "用户声音",
+      "source": "Google News - VPN Demand Scenes",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMiUEFVX3lxTE9XS25pbWVSTGV4SFV1OUxKU3ByOFpLYWlGV2RCOEt2b0FVLXlQS1VQYnl5XzBXLWRfR2pVTlgyeENCRG0wdmpUcWtVWlVnLWc5?oc=5\" target=\"_blank\">BBC iPlayer VPN: Best Picks That Still Work in 2026</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">TheBestVPN.com</font>",
+      "time": "2026-03-25 15:00",
+      "url": "https://news.google.com/rss/articles/CBMiUEFVX3lxTE9XS25pbWVSTGV4SFV1OUxKU3ByOFpLYWlGV2RCOEt2b0FVLXlQS1VQYnl5XzBXLWRfR2pVTlgyeENCRG0wdmpUcWtVWlVnLWc5?oc=5"
+    },
+    {
+      "id": "auto-c954057583d8",
+      "role": "参考信息",
+      "themeId": "d1",
+      "title": "Best VPNs for BBC iPlayer That Still Work in 2026 - Cybernews",
+      "sourceType": "用户声音",
+      "source": "Google News - VPN Demand Scenes",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMiYEFVX3lxTFA2WlViYXNPTWFRM2cxZVF5cXhhYUQybXpPNGxpdENMNl8ydktiemtrRmJndS1WWHV2ZzZkbHkyeGthTmpraGlhaWl6S2JGNEg4VE1xM2RmVjd4STBYU2FOag?oc=5\" target=\"_blank\">Best VPNs for BBC iPlayer That Still Work in 2026</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">Cybernews</font>",
+      "time": "2026-06-22 15:00",
+      "url": "https://news.google.com/rss/articles/CBMiYEFVX3lxTFA2WlViYXNPTWFRM2cxZVF5cXhhYUQybXpPNGxpdENMNl8ydktiemtrRmJndS1WWHV2ZzZkbHkyeGthTmpraGlhaWl6S2JGNEg4VE1xM2RmVjd4STBYU2FOag?oc=5"
+    },
+    {
+      "id": "auto-907443703b84",
+      "role": "核心证据",
+      "themeId": "d1",
+      "title": "Scotland vs Brazil: UK expats can stream the match on BBC iPlayer with NordVPN - TechRadar",
+      "sourceType": "用户声音",
+      "source": "Google News - VPN Demand Scenes",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMiugFBVV95cUxQODNNTTUteUNlZnpQelVEcGx0X0x0S25JTkNJQVplOGF5MkZlemlvdmRxaWxUNEVxaTN5Zmlpa1czX1E5QVVBNm9SNU11MWpWb0dFUEhUZXliOTNucmY3ZlJWSHNxQnk4bHZpVFBwSUc5dG13Y1JfWlZRV0o3czRsaXBTdTg5eTBWaG9aalRza3FkdG5Scm15QlMyRUYxOUF4Ty1WaldMcllJVW0yZmNKa3NxeXNvSVhlSmc?oc=5\" target=\"_blank\">Scotland vs Brazil: UK expats can stream the match on BBC iPlayer with NordVPN</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">TechRadar</font>",
+      "time": "2026-06-24 15:00",
+      "url": "https://news.google.com/rss/articles/CBMiugFBVV95cUxQODNNTTUteUNlZnpQelVEcGx0X0x0S25JTkNJQVplOGF5MkZlemlvdmRxaWxUNEVxaTN5Zmlpa1czX1E5QVVBNm9SNU11MWpWb0dFUEhUZXliOTNucmY3ZlJWSHNxQnk4bHZpVFBwSUc5dG13Y1JfWlZRV0o3czRsaXBTdTg5eTBWaG9aalRza3FkdG5Scm15QlMyRUYxOUF4Ty1WaldMcllJVW0yZmNKa3NxeXNvSVhlSmc?oc=5"
+    },
+    {
+      "id": "auto-53d770cc1fc8",
+      "role": "核心证据",
+      "themeId": "d1",
+      "title": "How To Use NordVPN to Unblock BBC iPlayer (Easy Access) - CyberInsider",
+      "sourceType": "用户声音",
+      "source": "Google News - VPN Demand Scenes",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMiZEFVX3lxTE9qV2RPUzMyd3RjOEtDaTZacUQ4MTRObUV0WjJrMHRJNjhYNm42V2h2ZWhtdEdnN1AzVEJmemlNcnFjTXRabkpTZG44cmJBNFlfVEFkVkxmMzk3dnExYklpRHJYdjU?oc=5\" target=\"_blank\">How To Use NordVPN to Unblock BBC iPlayer (Easy Access)</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">CyberInsider</font>",
+      "time": "2026-06-30 15:00",
+      "url": "https://news.google.com/rss/articles/CBMiZEFVX3lxTE9qV2RPUzMyd3RjOEtDaTZacUQ4MTRObUV0WjJrMHRJNjhYNm42V2h2ZWhtdEdnN1AzVEJmemlNcnFjTXRabkpTZG44cmJBNFlfVEFkVkxmMzk3dnExYklpRHJYdjU?oc=5"
+    },
+    {
+      "id": "auto-a8e3f7488300",
+      "role": "核心证据",
+      "themeId": "d3",
+      "title": "New Zealand denies VPN restrictions following fierce privacy backlash - TechRadar",
+      "sourceType": "政策监管",
+      "source": "Google News - VPN Policy",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMivAFBVV95cUxNVW9kUEFfdThxSnc1SWpnVUN5OEFmYUNic09ZUy1yV3BQaFlSQVZjcnpjem5ZWWhmRXFpOEJSSkswZUZsbGYzMThYVnhpTWU4Y2VIWDdvWUFOdkJqeHlLRTBsV1prNEI1X2tmVkFxYi1CRGtKb3FhWGFlZ2dRcWlYdklkWENUVlh2M09iSHN1RUxrejVGLTVpZGlXdDctb2V2aVZTb0dFeVprbkt3Ml9LLVctLTBtbWxwY2JONg?oc=5\" target=\"_blank\">New Zealand denies VPN restrictions following fierce privacy backlash</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">TechRadar</font>",
+      "time": "2026-07-08 00:14",
+      "url": "https://news.google.com/rss/articles/CBMivAFBVV95cUxNVW9kUEFfdThxSnc1SWpnVUN5OEFmYUNic09ZUy1yV3BQaFlSQVZjcnpjem5ZWWhmRXFpOEJSSkswZUZsbGYzMThYVnhpTWU4Y2VIWDdvWUFOdkJqeHlLRTBsV1prNEI1X2tmVkFxYi1CRGtKb3FhWGFlZ2dRcWlYdklkWENUVlh2M09iSHN1RUxrejVGLTVpZGlXdDctb2V2aVZTb0dFeVprbkt3Ml9LLVctLTBtbWxwY2JONg?oc=5"
+    },
+    {
+      "id": "auto-f8df677dc45b",
+      "role": "参考信息",
+      "themeId": "d1",
+      "title": "Utah’s New Law Targeting VPNs Goes Into Effect May 6th - Electronic Frontier Foundation",
+      "sourceType": "政策监管",
+      "source": "Google News - VPN Policy",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMikwFBVV95cUxQNDMzS09ITi03eWJ3VDBIcnR4RjE5UEktWXVnaXhFaG5lNTRTQ2g1bldGLXFxQXJrOF9XMmxYWEJFaWdEeGk3d1FhUWRuclBnN091RkxDQ185YXduTkR5OVFVb2J0Zjk5UENyN0U4TFdPbzFOcDZ6TzVYb3dSZ2dNUmUzeDVBWDZ6ZFN2Rk8yLTEzb1U?oc=5\" target=\"_blank\">Utah’s New Law Targeting VPNs Goes Into Effect May 6th</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">Electronic Frontier Foundation</font>",
+      "time": "2026-04-30 15:00",
+      "url": "https://news.google.com/rss/articles/CBMikwFBVV95cUxQNDMzS09ITi03eWJ3VDBIcnR4RjE5UEktWXVnaXhFaG5lNTRTQ2g1bldGLXFxQXJrOF9XMmxYWEJFaWdEeGk3d1FhUWRuclBnN091RkxDQ185YXduTkR5OVFVb2J0Zjk5UENyN0U4TFdPbzFOcDZ6TzVYb3dSZ2dNUmUzeDVBWDZ6ZFN2Rk8yLTEzb1U?oc=5"
+    },
+    {
+      "id": "auto-79cfcfb150a1",
+      "role": "参考信息",
+      "themeId": "d3",
+      "title": "EU Targets VPNs as Age Verification Loophole: What Happens Next? - BeInCrypto",
+      "sourceType": "政策监管",
+      "source": "Google News - VPN Policy",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMiZ0FVX3lxTE5qTzJFU1BwdXZtSDlFREEtMmVveVBjekE5WUh1TXdWN01qR0lqMURlLWF2MDRONl84UXZNRGJ6QTJUbXp1SzBka2dzMHltYUQ4WkpaRUxJWlkySDIwTVUwMGFia0ROY1U?oc=5\" target=\"_blank\">EU Targets VPNs as Age Verification Loophole: What Happens Next?</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">BeInCrypto</font>",
+      "time": "2026-07-06 21:37",
+      "url": "https://news.google.com/rss/articles/CBMiZ0FVX3lxTE5qTzJFU1BwdXZtSDlFREEtMmVveVBjekE5WUh1TXdWN01qR0lqMURlLWF2MDRONl84UXZNRGJ6QTJUbXp1SzBka2dzMHltYUQ4WkpaRUxJWlkySDIwTVUwMGFia0ROY1U?oc=5"
+    },
+    {
+      "id": "auto-6462e328853a",
+      "role": "参考信息",
+      "themeId": "d1",
+      "title": "Policymakers Should Stop Going After VPNs to Enforce Internet Age Restrictions - Cato Institute",
+      "sourceType": "政策监管",
+      "source": "Google News - VPN Policy",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMiowFBVV95cUxOX3Q4ZzJsdjhUZEtOWjlDU2NPaGVzN2wtVVF4R1Q0M3lOZHd2RkF5V1E1ZDhTRTJHSk9zcV91SzJBb2JxOVRMM3drWlBLRWtnbF9RQTBuLUNSeEJ1ZnFxU3NLZlAtVzQySkNiOGJCX2M1bUFDdnozXzU3N1Q1NW8tenhHLVdGdkpDRVVvb2VqV3JYQUY3N1VKREtPaVFFZU1KU0p3?oc=5\" target=\"_blank\">Policymakers Should Stop Going After VPNs to Enforce Internet Age Restrictions</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">Cato Institute</font>",
+      "time": "2026-01-26 16:00",
+      "url": "https://news.google.com/rss/articles/CBMiowFBVV95cUxOX3Q4ZzJsdjhUZEtOWjlDU2NPaGVzN2wtVVF4R1Q0M3lOZHd2RkF5V1E1ZDhTRTJHSk9zcV91SzJBb2JxOVRMM3drWlBLRWtnbF9RQTBuLUNSeEJ1ZnFxU3NLZlAtVzQySkNiOGJCX2M1bUFDdnozXzU3N1Q1NW8tenhHLVdGdkpDRVVvb2VqV3JYQUY3N1VKREtPaVFFZU1KU0p3?oc=5"
+    },
+    {
+      "id": "auto-8562672b7e19",
+      "role": "参考信息",
+      "themeId": "d3",
+      "title": "Utah’s New Age Verification Law Targeting VPNs Takes Effect This Week - Gizmodo",
+      "sourceType": "政策监管",
+      "source": "Google News - VPN Policy",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMioAFBVV95cUxNcFp0RWFnS3o0aGl1WEFndHNYV21UM0xZQnBFNlhjY3FMZ1hldVlTdmNxQVlLUndSVmJmU2hNd3pSUDByVkJ6ZDlIbDluVmhXeVpWNlNGZnM2bDR5ZTBrQnluSzhOQk5qbmt0a1JNM3lTZGkySjNHX1U4MWFNRG82Y1dpVHZudFEzY2c0UlVqMms0VzNPREI2NEFDdDctUHdp?oc=5\" target=\"_blank\">Utah’s New Age Verification Law Targeting VPNs Takes Effect This Week</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">Gizmodo</font>",
+      "time": "2026-05-04 15:00",
+      "url": "https://news.google.com/rss/articles/CBMioAFBVV95cUxNcFp0RWFnS3o0aGl1WEFndHNYV21UM0xZQnBFNlhjY3FMZ1hldVlTdmNxQVlLUndSVmJmU2hNd3pSUDByVkJ6ZDlIbDluVmhXeVpWNlNGZnM2bDR5ZTBrQnluSzhOQk5qbmt0a1JNM3lTZGkySjNHX1U4MWFNRG82Y1dpVHZudFEzY2c0UlVqMms0VzNPREI2NEFDdDctUHdp?oc=5"
+    },
+    {
+      "id": "auto-1211d644b24c",
+      "role": "参考信息",
+      "themeId": "d3",
+      "title": "Utah’s online porn age verification law now includes VPNs. Critics say it won’t work - NPR Utah | KUER",
+      "sourceType": "政策监管",
+      "source": "Google News - VPN Policy",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMizgFBVV95cUxNbVh6dW5tSC1hUUh6d1lTWTZVWHhTUWppNm9Wc2ZOYUh3Y2tfUDBralZrNnI0Q0wzQVVCRWdmZUlsaW45bzVxejl3SmJoUEFCTkgtQVU5NG5VNXdvdHR4SjViaUxuTms1NndHNUdzVE1BUEpubnMzc01zbmRvdmtjeGp0UDB3WlFaakxkaVBTOVRmNEFPa0szWE9ENGdtbElEcWU1Ql9ObWF6cHhyNmp3a0xRX1ZDaVJIdTZJR3dOVE1wWlJYLWNwc0hLcDk5Zw?oc=5\" target=\"_blank\">Utah’s online porn age verification law now includes VPNs. Critics say it won’t work</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">NPR Utah | KUER</font>",
+      "time": "2026-05-07 15:00",
+      "url": "https://news.google.com/rss/articles/CBMizgFBVV95cUxNbVh6dW5tSC1hUUh6d1lTWTZVWHhTUWppNm9Wc2ZOYUh3Y2tfUDBralZrNnI0Q0wzQVVCRWdmZUlsaW45bzVxejl3SmJoUEFCTkgtQVU5NG5VNXdvdHR4SjViaUxuTms1NndHNUdzVE1BUEpubnMzc01zbmRvdmtjeGp0UDB3WlFaakxkaVBTOVRmNEFPa0szWE9ENGdtbElEcWU1Ql9ObWF6cHhyNmp3a0xRX1ZDaVJIdTZJR3dOVE1wWlJYLWNwc0hLcDk5Zw?oc=5"
+    },
+    {
+      "id": "auto-ad3eb9da2617",
+      "role": "参考信息",
+      "themeId": "d1",
+      "title": "Utah Takes Aim at VPNs With New Age-Verification Law. What It Means for You - PCMag",
+      "sourceType": "政策监管",
+      "source": "Google News - VPN Policy",
+      "summary": "<a href=\"https://news.google.com/rss/articles/CBMilwFBVV95cUxNcDlaN0ZGRzBXYmFWN1ozbXNCdEdMcnpKRDFMZUNIdWVxTGJQcEhwR21ROWMxbVozR2h3ZW5JaVpSRm1jNUQxQi1hbzZvVmtnWTJ4Y1g1TXdkWkMyT09RVTRhZlpJUFd3UlUxS2swUjFlMXBHaDB6NVhKa0pwZUJfN3ludlF5aU9Pay14cURkdTZReTRCdXhF?oc=5\" target=\"_blank\">Utah Takes Aim at VPNs With New Age-Verification Law. What It Means for You</a>&nbsp;&nbsp;<font color=\"#6f6f6f\">PCMag</font>",
+      "time": "2026-05-05 15:00",
+      "url": "https://news.google.com/rss/articles/CBMilwFBVV95cUxNcDlaN0ZGRzBXYmFWN1ozbXNCdEdMcnpKRDFMZUNIdWVxTGJQcEhwR21ROWMxbVozR2h3ZW5JaVpSRm1jNUQxQi1hbzZvVmtnWTJ4Y1g1TXdkWkMyT09RVTRhZlpJUFd3UlUxS2swUjFlMXBHaDB6NVhKa0pwZUJfN3ludlF5aU9Pay14cURkdTZReTRCdXhF?oc=5"
+    },
+    {
       "id": "e1",
       "role": "核心证据",
       "themeId": "d1",
@@ -248,9 +529,24 @@
     }
   ],
   "themeRelations": [
-    { "leftThemeId": "d1", "rightThemeId": "a1", "level": "强关联", "reason": "共同平台 BBC iPlayer，时间窗口 24 小时内重叠" },
-    { "leftThemeId": "d2", "rightThemeId": "a3", "level": "中关联", "reason": "共同流媒体场景，但目标市场仍需确认" },
-    { "leftThemeId": "d1", "rightThemeId": "a2", "level": "弱关联", "reason": "同为流媒体增长场景，平台不同" }
+    {
+      "leftThemeId": "d1",
+      "rightThemeId": "a1",
+      "level": "强关联",
+      "reason": "共同平台 BBC iPlayer，时间窗口 24 小时内重叠"
+    },
+    {
+      "leftThemeId": "d2",
+      "rightThemeId": "a3",
+      "level": "中关联",
+      "reason": "共同流媒体场景，但目标市场仍需确认"
+    },
+    {
+      "leftThemeId": "d1",
+      "rightThemeId": "a2",
+      "level": "弱关联",
+      "reason": "同为流媒体增长场景，平台不同"
+    }
   ],
   "opportunities": [
     {
@@ -260,7 +556,11 @@
       "type": "短期机会",
       "feasibility": "待验证",
       "status": "验证中",
-      "actions": ["产品能力验证", "SEO页面", "内容选题"],
+      "actions": [
+        "产品能力验证",
+        "SEO页面",
+        "内容选题"
+      ],
       "cycle": "先用1-3天验证英国节点，再进入2-4周SEO页面建设",
       "nextStep": "验证英国节点播放稳定性与 VPN 检测情况",
       "owner": "增长PM"
@@ -272,7 +572,11 @@
       "type": "中长期机会",
       "feasibility": "待验证",
       "status": "待评估",
-      "actions": ["内容选题", "落地页优化", "客服/运营响应"],
+      "actions": [
+        "内容选题",
+        "落地页优化",
+        "客服/运营响应"
+      ],
       "cycle": "1-2周完成内容验证，后续按月观察搜索需求",
       "nextStep": "梳理支付地区限制 FAQ 与可合规表达边界",
       "owner": "内容运营"
@@ -284,7 +588,10 @@
       "type": "短期机会",
       "feasibility": "可行",
       "status": "待评估",
-      "actions": ["价格/活动策略", "落地页优化"],
+      "actions": [
+        "价格/活动策略",
+        "落地页优化"
+      ],
       "cycle": "3-7天完成竞品价格表达与活动页对比",
       "nextStep": "对比核心竞品折扣表达和设备权益表述",
       "owner": "增长运营"
