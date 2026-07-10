@@ -12,6 +12,7 @@ type BriefingItem = {
   period: "daily" | "weekly";
   type: "需求信号" | "竞品动作" | "外部变化" | "待处理";
   title: string;
+  originalTitle?: string;
   summary: string;
   priority: Priority;
   trend: Trend;
@@ -44,6 +45,7 @@ type Evidence = {
   role: "核心证据" | "参考信息";
   themeId: string;
   title: string;
+  originalTitle?: string;
   sourceType: string;
   source: string;
   summary: string;
@@ -805,7 +807,22 @@ export default function Home() {
                               <p className="text-xs font-semibold text-teal-800">相关证据</p>
                               <div className="mt-2 grid gap-2">
                                 {themeEvidence.slice(0, 3).map((item) => (
-                                  <p key={item.id} className="break-words text-xs leading-5 text-zinc-700">{item.title}</p>
+                                  <div key={item.id} className="rounded bg-white/70 p-2">
+                                    <p className="break-words text-xs leading-5 text-zinc-700">{item.title}</p>
+                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                                      <span>{item.sourceType} · {item.source}</span>
+                                      {item.url && (
+                                        <a
+                                          href={item.url}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="font-semibold text-teal-700 hover:text-teal-900"
+                                        >
+                                          查看来源
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
                                 ))}
                                 {themeEvidence.length === 0 && <p className="text-xs text-zinc-500">暂无证据</p>}
                               </div>
@@ -972,7 +989,22 @@ export default function Home() {
                     <p className="text-sm font-semibold">核心证据</p>
                     <div className="mt-3 grid gap-3">
                       {selectedEvidence.filter((item) => item.role === "核心证据").map((item) => (
-                        <p key={item.id} className="break-words text-sm leading-6 text-zinc-600">{item.title}</p>
+                        <div key={item.id} className="rounded bg-zinc-50 p-3">
+                          <p className="break-words text-sm leading-6 text-zinc-700">{item.title}</p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                            <span>{item.sourceType} · {item.source}</span>
+                            {item.url && (
+                              <a
+                                href={item.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="font-semibold text-teal-700 hover:text-teal-900"
+                              >
+                                查看来源
+                              </a>
+                            )}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -980,7 +1012,22 @@ export default function Home() {
                     <p className="text-sm font-semibold">参考信息</p>
                     <div className="mt-3 grid gap-3">
                       {selectedEvidence.filter((item) => item.role === "参考信息").map((item) => (
-                        <p key={item.id} className="break-words text-sm leading-6 text-zinc-600">{item.title}</p>
+                        <div key={item.id} className="rounded bg-zinc-50 p-3">
+                          <p className="break-words text-sm leading-6 text-zinc-700">{item.title}</p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                            <span>{item.sourceType} · {item.source}</span>
+                            {item.url && (
+                              <a
+                                href={item.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="font-semibold text-teal-700 hover:text-teal-900"
+                              >
+                                查看来源
+                              </a>
+                            )}
+                          </div>
+                        </div>
                       ))}
                       {selectedEvidence.filter((item) => item.role === "参考信息").length === 0 && (
                         <p className="text-sm text-zinc-500">暂无参考信息</p>
