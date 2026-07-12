@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-07-11T07:20:12.990Z",
-  "displayDate": "2026-07-11",
+  "generatedAt": "2026-07-12T07:40:38.041Z",
+  "displayDate": "2026-07-12",
   "status": {
-    "newItemsToday": 65,
-    "highPriorityToday": 25,
+    "newItemsToday": 8,
+    "highPriorityToday": 2,
     "pendingReview": 112,
     "normalSourceRate": 57,
     "sourcesWaitingReview": 112,
@@ -54,6 +54,34 @@
     }
   ],
   "briefingItems": [
+    {
+      "id": "auto-2026-07-12-1",
+      "period": "daily",
+      "type": "竞品动作",
+      "title": "NordVPN 动作：竞品对比与评测 · Gizmodo",
+      "originalTitle": "Surfshark vs NordVPN vs ExpressVPN: Which VPN Wins? - Gizmodo",
+      "summary": "该信息来自Google News - VPN Competitors（Gizmodo），显示NordVPN围绕「竞品对比与评测」出现产品、内容、价格或品牌动作。系统将其标记为核心证据，用于判断竞品正在把哪些需求场景转化为增长入口。原文标题：Surfshark vs NordVPN vs ExpressVPN: Which VPN Wins?。",
+      "priority": "高",
+      "trend": "新出现",
+      "evidence": 1,
+      "source": "Google News - VPN Competitors",
+      "time": "2026-07-10 14:00",
+      "url": "https://news.google.com/rss/articles/CBMicEFVX3lxTE1Sd1BUbU9KaElrVDJXOTFHdFFtQXd4UV9fVUlDZDUwOTZnZmRnNkxpdlc3eEtXWHFjYmFLcDB4MEhEY0dKcWxlV0pUY1BnQU1YalIzMUwyMGRnYnJfQ1dpM1A2b2VXR1pOa3BON29QNmg?oc=5"
+    },
+    {
+      "id": "auto-2026-07-12-2",
+      "period": "daily",
+      "type": "竞品动作",
+      "title": "Surfshark 动作：家庭订阅与价格活动 · Surfshark",
+      "originalTitle": "Is there a VPN for Safari, and how to choose one - Surfshark",
+      "summary": "该信息来自Google News - VPN Competitors（Surfshark），显示Surfshark围绕「家庭订阅与价格活动」出现产品、内容、价格或品牌动作。系统将其标记为核心证据，用于判断竞品正在把哪些需求场景转化为增长入口。原文标题：Is there a VPN for Safari, and how to choose one。",
+      "priority": "高",
+      "trend": "新出现",
+      "evidence": 1,
+      "source": "Google News - VPN Competitors",
+      "time": "2026-06-19 15:00",
+      "url": "https://news.google.com/rss/articles/CBMiTkFVX3lxTE4xOWpCNm54aVRPVnhpbkNQYnVsaFBWbTk0T2ZmSl83RmpwdTZMTko0SGVxMEJOZnV4R3ZubzBaanhzTi16WS1IV0RwY29tZw?oc=5"
+    },
     {
       "id": "auto-2026-07-11-1",
       "period": "daily",
@@ -320,6 +348,102 @@
     }
   ],
   "evidence": [
+    {
+      "id": "auto-6767bce88088",
+      "role": "核心证据",
+      "themeId": "a2",
+      "title": "NordVPN 动作：竞品对比与评测 · Gizmodo",
+      "originalTitle": "Surfshark vs NordVPN vs ExpressVPN: Which VPN Wins? - Gizmodo",
+      "sourceType": "竞品情报",
+      "source": "Google News - VPN Competitors",
+      "summary": "该信息来自Google News - VPN Competitors（Gizmodo），显示NordVPN围绕「竞品对比与评测」出现产品、内容、价格或品牌动作。系统将其标记为核心证据，用于判断竞品正在把哪些需求场景转化为增长入口。原文标题：Surfshark vs NordVPN vs ExpressVPN: Which VPN Wins?。",
+      "time": "2026-07-10 14:00",
+      "url": "https://news.google.com/rss/articles/CBMicEFVX3lxTE1Sd1BUbU9KaElrVDJXOTFHdFFtQXd4UV9fVUlDZDUwOTZnZmRnNkxpdlc3eEtXWHFjYmFLcDB4MEhEY0dKcWxlV0pUY1BnQU1YalIzMUwyMGRnYnJfQ1dpM1A2b2VXR1pOa3BON29QNmg?oc=5"
+    },
+    {
+      "id": "auto-8d6a4b855ea7",
+      "role": "参考信息",
+      "themeId": "a1",
+      "title": "竞品动作：VPN 市场相关信号 · TechRadar",
+      "originalTitle": "The best VPN service 2026 - TechRadar",
+      "sourceType": "竞品情报",
+      "source": "Google News - VPN Competitors",
+      "summary": "该信息来自Google News - VPN Competitors（TechRadar），显示相关竞品围绕「VPN 市场相关信号」出现产品、内容、价格或品牌动作。系统将其标记为参考信息，用于判断竞品正在把哪些需求场景转化为增长入口。原文标题：The best VPN service 2026。",
+      "time": "2026-07-10 01:35",
+      "url": "https://news.google.com/rss/articles/CBMiT0FVX3lxTE5ndmd5bVlyRGVkY08wb0FCbXZ5REI4REJDU2lpaGJBLTh5QU9YNmpMeENJa0w5UjUyek53XzFwUVh4S0dYNnczbGpfUGRSWXM?oc=5"
+    },
+    {
+      "id": "auto-970d6d2a19a1",
+      "role": "参考信息",
+      "themeId": "a1",
+      "title": "竞品动作：VPN 市场相关信号 · CNET",
+      "originalTitle": "Best VPN Service for 2026: The Top-Ranked VPNs in Our Testing - CNET",
+      "sourceType": "竞品情报",
+      "source": "Google News - VPN Competitors",
+      "summary": "该信息来自Google News - VPN Competitors（CNET），显示相关竞品围绕「VPN 市场相关信号」出现产品、内容、价格或品牌动作。系统将其标记为参考信息，用于判断竞品正在把哪些需求场景转化为增长入口。原文标题：Best VPN Service for 2026: The Top-Ranked VPNs in Our Testing。",
+      "time": "2026-07-01 15:00",
+      "url": "https://news.google.com/rss/articles/CBMiaEFVX3lxTE4ydWc2NWJTZzdmQXVtdVFDT1lBbW5XTkZGVkxsbWF6dUYxejRMbER5UFJKMmlGdEhld0l1YjdjdlVudUM5eWItWkxxNjJkU25wcGtxQkhVejdyS3hXMGJ6MVBUNmtnSXlS?oc=5"
+    },
+    {
+      "id": "auto-50c52cf6a56b",
+      "role": "核心证据",
+      "themeId": "a2",
+      "title": "Surfshark 动作：家庭订阅与价格活动 · Surfshark",
+      "originalTitle": "Is there a VPN for Safari, and how to choose one - Surfshark",
+      "sourceType": "竞品情报",
+      "source": "Google News - VPN Competitors",
+      "summary": "该信息来自Google News - VPN Competitors（Surfshark），显示Surfshark围绕「家庭订阅与价格活动」出现产品、内容、价格或品牌动作。系统将其标记为核心证据，用于判断竞品正在把哪些需求场景转化为增长入口。原文标题：Is there a VPN for Safari, and how to choose one。",
+      "time": "2026-06-19 15:00",
+      "url": "https://news.google.com/rss/articles/CBMiTkFVX3lxTE4xOWpCNm54aVRPVnhpbkNQYnVsaFBWbTk0T2ZmSl83RmpwdTZMTko0SGVxMEJOZnV4R3ZubzBaanhzTi16WS1IV0RwY29tZw?oc=5"
+    },
+    {
+      "id": "auto-6462e328853a",
+      "role": "参考信息",
+      "themeId": "d1",
+      "title": "政策监管：BBC iPlayer 访问限制 · Cato Institute",
+      "originalTitle": "Policymakers Should Stop Going After VPNs to Enforce Internet Age Restrictions - Cato Institute",
+      "sourceType": "政策监管",
+      "source": "Google News - VPN Policy",
+      "summary": "该信息来自Google News - VPN Policy（Cato Institute），指向「BBC iPlayer 访问限制」相关的政策或监管变化。系统将其标记为参考信息，作为风险提示和机会评估的参考，但不直接降低增长机会判断。原文标题：Policymakers Should Stop Going After VPNs to Enforce Internet Age Restrictions。",
+      "time": "2026-01-26 16:00",
+      "url": "https://news.google.com/rss/articles/CBMiowFBVV95cUxOX3Q4ZzJsdjhUZEtOWjlDU2NPaGVzN2wtVVF4R1Q0M3lOZHd2RkF5V1E1ZDhTRTJHSk9zcV91SzJBb2JxOVRMM3drWlBLRWtnbF9RQTBuLUNSeEJ1ZnFxU3NLZlAtVzQySkNiOGJCX2M1bUFDdnozXzU3N1Q1NW8tenhHLVdGdkpDRVVvb2VqV3JYQUY3N1VKREtPaVFFZU1KU0p3?oc=5"
+    },
+    {
+      "id": "auto-1211d644b24c",
+      "role": "参考信息",
+      "themeId": "d3",
+      "title": "政策监管：年龄验证与 VPN 限制 · NPR Utah | KUER",
+      "originalTitle": "Utah’s online porn age verification law now includes VPNs. Critics say it won’t work - NPR Utah | KUER",
+      "sourceType": "政策监管",
+      "source": "Google News - VPN Policy",
+      "summary": "该信息来自Google News - VPN Policy（NPR Utah | KUER），指向「年龄验证与 VPN 限制」相关的政策或监管变化。系统将其标记为参考信息，作为风险提示和机会评估的参考，但不直接降低增长机会判断。原文标题：Utah’s online porn age verification law now includes VPNs. Critics say it won’t work。",
+      "time": "2026-05-07 15:00",
+      "url": "https://news.google.com/rss/articles/CBMizgFBVV95cUxNbVh6dW5tSC1hUUh6d1lTWTZVWHhTUWppNm9Wc2ZOYUh3Y2tfUDBralZrNnI0Q0wzQVVCRWdmZUlsaW45bzVxejl3SmJoUEFCTkgtQVU5NG5VNXdvdHR4SjViaUxuTms1NndHNUdzVE1BUEpubnMzc01zbmRvdmtjeGp0UDB3WlFaakxkaVBTOVRmNEFPa0szWE9ENGdtbElEcWU1Ql9ObWF6cHhyNmp3a0xRX1ZDaVJIdTZJR3dOVE1wWlJYLWNwc0hLcDk5Zw?oc=5"
+    },
+    {
+      "id": "auto-8562672b7e19",
+      "role": "参考信息",
+      "themeId": "d3",
+      "title": "政策监管：年龄验证与 VPN 限制 · Gizmodo",
+      "originalTitle": "Utah’s New Age Verification Law Targeting VPNs Takes Effect This Week - Gizmodo",
+      "sourceType": "政策监管",
+      "source": "Google News - VPN Policy",
+      "summary": "该信息来自Google News - VPN Policy（Gizmodo），指向「年龄验证与 VPN 限制」相关的政策或监管变化。系统将其标记为参考信息，作为风险提示和机会评估的参考，但不直接降低增长机会判断。原文标题：Utah’s New Age Verification Law Targeting VPNs Takes Effect This Week。",
+      "time": "2026-05-04 15:00",
+      "url": "https://news.google.com/rss/articles/CBMioAFBVV95cUxNcFp0RWFnS3o0aGl1WEFndHNYV21UM0xZQnBFNlhjY3FMZ1hldVlTdmNxQVlLUndSVmJmU2hNd3pSUDByVkJ6ZDlIbDluVmhXeVpWNlNGZnM2bDR5ZTBrQnluSzhOQk5qbmt0a1JNM3lTZGkySjNHX1U4MWFNRG82Y1dpVHZudFEzY2c0UlVqMms0VzNPREI2NEFDdDctUHdp?oc=5"
+    },
+    {
+      "id": "auto-ad3eb9da2617",
+      "role": "参考信息",
+      "themeId": "d3",
+      "title": "政策监管：年龄验证与 VPN 限制 · PCMag",
+      "originalTitle": "Utah Takes Aim at VPNs With New Age-Verification Law. What It Means for You - PCMag",
+      "sourceType": "政策监管",
+      "source": "Google News - VPN Policy",
+      "summary": "该信息来自Google News - VPN Policy（PCMag），指向「年龄验证与 VPN 限制」相关的政策或监管变化。系统将其标记为参考信息，作为风险提示和机会评估的参考，但不直接降低增长机会判断。原文标题：Utah Takes Aim at VPNs With New Age-Verification Law. What It Means for You。",
+      "time": "2026-05-05 15:00",
+      "url": "https://news.google.com/rss/articles/CBMilwFBVV95cUxNcDlaN0ZGRzBXYmFWN1ozbXNCdEdMcnpKRDFMZUNIdWVxTGJQcEhwR21ROWMxbVozR2h3ZW5JaVpSRm1jNUQxQi1hbzZvVmtnWTJ4Y1g1TXdkWkMyT09RVTRhZlpJUFd3UlUxS2swUjFlMXBHaDB6NVhKa0pwZUJfN3ludlF5aU9Pay14cURkdTZReTRCdXhF?oc=5"
+    },
     {
       "id": "auto-22698cb7b191",
       "role": "核心证据",
@@ -1183,102 +1307,6 @@
       "time": "2026-06-23 15:00",
       "url": "https://news.google.com/rss/articles/CBMigwFBVV95cUxOdDdNX0x0V2k2UUVlWUVqNjNQdEJ5OXY1RExBZTJTa25xNHAzaFRUMVk2ZnNEZzVYLXItSXRjdkQtRjFXTkIwUE9LREllU1FVajJMTUxfWGE5elpSRTM2WkliajlKX3A4N0czTWhIWmhTbDlVTXROOUV4eWU5SnBJNk9Iaw?oc=5",
       "originalTitle": "How to purchase ExpressVPN in-app and set up your account - ExpressVPN"
-    },
-    {
-      "id": "auto-6abb2cf70226",
-      "role": "核心证据",
-      "themeId": "a2",
-      "title": "Surfshark 动作：竞品对比与评测 · The Independent",
-      "sourceType": "竞品情报",
-      "source": "Google News - VPN Competitors",
-      "summary": "该信息来自Google News - VPN Competitors（The Independent），显示Surfshark围绕「竞品对比与评测」出现产品、内容、价格或品牌动作。系统将其标记为核心证据，用于判断竞品正在把哪些需求场景转化为增长入口。原文标题：Surfshark vs IPVanish: Our expert compares the VPN providers。",
-      "time": "2026-07-07 22:19",
-      "url": "https://news.google.com/rss/articles/CBMinwFBVV95cUxQME9rMFhwZUpFS2VSVjd0aXFOOUhYZEZLSG5UQXE0eDRyMTJKeEs5aHhyUlpNM1Jvd21vU0NTTWpSY2t6aUhmcDRwX3gtT3ZZbVZtZ05zSVFZczFoYVRETzZQcldld0lkWWJLQVF2enVFOWhHTVlaVElSSWpZX3hkSDZrRmxWc19jalZMeWJYRWRHSTRkT2RvZGExSmw5Znc?oc=5",
-      "originalTitle": "Surfshark vs IPVanish: Our expert compares the VPN providers - The Independent"
-    },
-    {
-      "id": "auto-1e2c229cba19",
-      "role": "参考信息",
-      "themeId": "d1",
-      "title": "用户需求：BBC iPlayer 访问限制 · TheBestVPN.com",
-      "sourceType": "用户声音",
-      "source": "Google News - VPN Demand Scenes",
-      "summary": "该信息来自Google News - VPN Demand Scenes（TheBestVPN.com），反映外部讨论中出现「BBC iPlayer 访问限制」相关需求。系统将其标记为参考信息，重点用于判断用户想访问什么内容或服务，以及受到地区、支付、隐私或平台规则限制后是否产生 VPN 使用动机。原文标题：BBC iPlayer VPN: Best Picks That Still Work in 2026。",
-      "time": "2026-03-25 15:00",
-      "url": "https://news.google.com/rss/articles/CBMiUEFVX3lxTE9XS25pbWVSTGV4SFV1OUxKU3ByOFpLYWlGV2RCOEt2b0FVLXlQS1VQYnl5XzBXLWRfR2pVTlgyeENCRG0wdmpUcWtVWlVnLWc5?oc=5",
-      "originalTitle": "BBC iPlayer VPN: Best Picks That Still Work in 2026 - TheBestVPN.com"
-    },
-    {
-      "id": "auto-c954057583d8",
-      "role": "参考信息",
-      "themeId": "d1",
-      "title": "用户需求：BBC iPlayer 访问限制 · Cybernews",
-      "sourceType": "用户声音",
-      "source": "Google News - VPN Demand Scenes",
-      "summary": "该信息来自Google News - VPN Demand Scenes（Cybernews），反映外部讨论中出现「BBC iPlayer 访问限制」相关需求。系统将其标记为参考信息，重点用于判断用户想访问什么内容或服务，以及受到地区、支付、隐私或平台规则限制后是否产生 VPN 使用动机。原文标题：Best VPNs for BBC iPlayer That Still Work in 2026。",
-      "time": "2026-06-22 15:00",
-      "url": "https://news.google.com/rss/articles/CBMiYEFVX3lxTFA2WlViYXNPTWFRM2cxZVF5cXhhYUQybXpPNGxpdENMNl8ydktiemtrRmJndS1WWHV2ZzZkbHkyeGthTmpraGlhaWl6S2JGNEg4VE1xM2RmVjd4STBYU2FOag?oc=5",
-      "originalTitle": "Best VPNs for BBC iPlayer That Still Work in 2026 - Cybernews"
-    },
-    {
-      "id": "auto-907443703b84",
-      "role": "核心证据",
-      "themeId": "d1",
-      "title": "用户需求：BBC iPlayer 访问限制 · TechRadar",
-      "sourceType": "用户声音",
-      "source": "Google News - VPN Demand Scenes",
-      "summary": "该信息来自Google News - VPN Demand Scenes（TechRadar），反映外部讨论中出现「BBC iPlayer 访问限制」相关需求。系统将其标记为核心证据，重点用于判断用户想访问什么内容或服务，以及受到地区、支付、隐私或平台规则限制后是否产生 VPN 使用动机。原文标题：Scotland vs Brazil: UK expats can stream the match on BBC iPlayer with NordVPN。",
-      "time": "2026-06-24 15:00",
-      "url": "https://news.google.com/rss/articles/CBMiugFBVV95cUxQODNNTTUteUNlZnpQelVEcGx0X0x0S25JTkNJQVplOGF5MkZlemlvdmRxaWxUNEVxaTN5Zmlpa1czX1E5QVVBNm9SNU11MWpWb0dFUEhUZXliOTNucmY3ZlJWSHNxQnk4bHZpVFBwSUc5dG13Y1JfWlZRV0o3czRsaXBTdTg5eTBWaG9aalRza3FkdG5Scm15QlMyRUYxOUF4Ty1WaldMcllJVW0yZmNKa3NxeXNvSVhlSmc?oc=5",
-      "originalTitle": "Scotland vs Brazil: UK expats can stream the match on BBC iPlayer with NordVPN - TechRadar"
-    },
-    {
-      "id": "auto-53d770cc1fc8",
-      "role": "核心证据",
-      "themeId": "d1",
-      "title": "用户需求：BBC iPlayer 访问限制 · CyberInsider",
-      "sourceType": "用户声音",
-      "source": "Google News - VPN Demand Scenes",
-      "summary": "该信息来自Google News - VPN Demand Scenes（CyberInsider），反映外部讨论中出现「BBC iPlayer 访问限制」相关需求。系统将其标记为核心证据，重点用于判断用户想访问什么内容或服务，以及受到地区、支付、隐私或平台规则限制后是否产生 VPN 使用动机。原文标题：How To Use NordVPN to Unblock BBC iPlayer (Easy Access)。",
-      "time": "2026-06-30 15:00",
-      "url": "https://news.google.com/rss/articles/CBMiZEFVX3lxTE9qV2RPUzMyd3RjOEtDaTZacUQ4MTRObUV0WjJrMHRJNjhYNm42V2h2ZWhtdEdnN1AzVEJmemlNcnFjTXRabkpTZG44cmJBNFlfVEFkVkxmMzk3dnExYklpRHJYdjU?oc=5",
-      "originalTitle": "How To Use NordVPN to Unblock BBC iPlayer (Easy Access) - CyberInsider"
-    },
-    {
-      "id": "auto-a8e3f7488300",
-      "role": "核心证据",
-      "themeId": "d3",
-      "title": "政策监管：隐私监管与合规风险 · TechRadar",
-      "sourceType": "政策监管",
-      "source": "Google News - VPN Policy",
-      "summary": "该信息来自Google News - VPN Policy（TechRadar），指向「隐私监管与合规风险」相关的政策或监管变化。系统将其标记为核心证据，作为风险提示和机会评估的参考，但不直接降低增长机会判断。原文标题：New Zealand denies VPN restrictions following fierce privacy backlash。",
-      "time": "2026-07-08 00:14",
-      "url": "https://news.google.com/rss/articles/CBMivAFBVV95cUxNVW9kUEFfdThxSnc1SWpnVUN5OEFmYUNic09ZUy1yV3BQaFlSQVZjcnpjem5ZWWhmRXFpOEJSSkswZUZsbGYzMThYVnhpTWU4Y2VIWDdvWUFOdkJqeHlLRTBsV1prNEI1X2tmVkFxYi1CRGtKb3FhWGFlZ2dRcWlYdklkWENUVlh2M09iSHN1RUxrejVGLTVpZGlXdDctb2V2aVZTb0dFeVprbkt3Ml9LLVctLTBtbWxwY2JONg?oc=5",
-      "originalTitle": "New Zealand denies VPN restrictions following fierce privacy backlash - TechRadar"
-    },
-    {
-      "id": "auto-f8df677dc45b",
-      "role": "参考信息",
-      "themeId": "d1",
-      "title": "政策监管：隐私监管与合规风险 · Electronic Frontier Foundation",
-      "sourceType": "政策监管",
-      "source": "Google News - VPN Policy",
-      "summary": "该信息来自Google News - VPN Policy（Electronic Frontier Foundation），指向「隐私监管与合规风险」相关的政策或监管变化。系统将其标记为参考信息，作为风险提示和机会评估的参考，但不直接降低增长机会判断。原文标题：Utah’s New Law Targeting VPNs Goes Into Effect May 6th。",
-      "time": "2026-04-30 15:00",
-      "url": "https://news.google.com/rss/articles/CBMikwFBVV95cUxQNDMzS09ITi03eWJ3VDBIcnR4RjE5UEktWXVnaXhFaG5lNTRTQ2g1bldGLXFxQXJrOF9XMmxYWEJFaWdEeGk3d1FhUWRuclBnN091RkxDQ185YXduTkR5OVFVb2J0Zjk5UENyN0U4TFdPbzFOcDZ6TzVYb3dSZ2dNUmUzeDVBWDZ6ZFN2Rk8yLTEzb1U?oc=5",
-      "originalTitle": "Utah’s New Law Targeting VPNs Goes Into Effect May 6th - Electronic Frontier Foundation"
-    },
-    {
-      "id": "auto-79cfcfb150a1",
-      "role": "参考信息",
-      "themeId": "d3",
-      "title": "政策监管：年龄验证与 VPN 限制 · BeInCrypto",
-      "sourceType": "政策监管",
-      "source": "Google News - VPN Policy",
-      "summary": "该信息来自Google News - VPN Policy（BeInCrypto），指向「年龄验证与 VPN 限制」相关的政策或监管变化。系统将其标记为参考信息，作为风险提示和机会评估的参考，但不直接降低增长机会判断。原文标题：EU Targets VPNs as Age Verification Loophole: What Happens Next?。",
-      "time": "2026-07-06 21:37",
-      "url": "https://news.google.com/rss/articles/CBMiZ0FVX3lxTE5qTzJFU1BwdXZtSDlFREEtMmVveVBjekE5WUh1TXdWN01qR0lqMURlLWF2MDRONl84UXZNRGJ6QTJUbXp1SzBka2dzMHltYUQ4WkpaRUxJWlkySDIwTVUwMGFia0ROY1U?oc=5",
-      "originalTitle": "EU Targets VPNs as Age Verification Loophole: What Happens Next? - BeInCrypto"
     }
   ],
   "themeRelations": [
