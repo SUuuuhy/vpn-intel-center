@@ -9,11 +9,13 @@
 - 潜在机会池，保留多信源认证后的聚合机会
 - 信息源管理，维护信源状态、抓取方式和频率
 - 按板块调度的每日自动抓取、去重和轻量评级
+- 固定专题采集任务，支持必检索链接深扫和逐关键词搜索
 
 ## 数据结构
 
 - `data/intelligence.json`: 看板实际读取的数据
 - `data/source-rules.json`: 自动更新使用的信源和关键词规则
+- `data/collection-profiles.json`: 流媒体、社交平台等专题采集方法
 - `scripts/update_daily.mjs`: 每日抓取、轻量分类、写回数据的脚本
 
 ## GitHub Pages 自动更新
@@ -44,4 +46,10 @@ npm run build:pages
 
 ```bash
 node scripts/update_daily.mjs --dry-run
+```
+
+只检查专题采集任务：
+
+```bash
+node scripts/update_daily.mjs --dry-run --profiles-only
 ```

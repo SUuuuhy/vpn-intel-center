@@ -1,6 +1,7 @@
 "use client";
 
 import intelligenceData from "@/data/intelligence.json";
+import collectionProfilesData from "@/data/collection-profiles.json";
 import sourceRulesData from "@/data/source-rules.json";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
@@ -88,6 +89,11 @@ type Evidence = {
   displayPriority?: string;
   sourcePanel?: string;
   vpnRelevance?: string;
+  collectionProfile?: string;
+  collectionProfileName?: string;
+  collectionKeyword?: string;
+  collectionRule?: string;
+  hotspotType?: string;
 };
 
 type Opportunity = {
@@ -129,6 +135,24 @@ type IntelligenceData = {
   opportunities: Opportunity[];
 };
 
+type CollectionProfile = {
+  id: string;
+  name: string;
+  panel: string;
+  sourceType: string;
+  hotspotType: string;
+  frequency: string;
+  requiredUrls: string[];
+  searchKeywords: string[];
+  includeKeywords: string[];
+  excludeKeywords: string[];
+  summaryRule: string;
+};
+
+type CollectionProfilesData = {
+  profiles: CollectionProfile[];
+};
+
 type OpportunityEdit = {
   rating: Priority;
   status: string;
@@ -137,6 +161,7 @@ type OpportunityEdit = {
 
 const intelligence = intelligenceData as IntelligenceData;
 const sourceRules = sourceRulesData as SourceRulesData;
+const collectionProfiles = (collectionProfilesData as CollectionProfilesData).profiles;
 
 const panelViews: PanelView[] = ["竞品情报", "用户声音", "增长热点", "政策风险", "历史信息库", "潜在机会", "信息源管理"];
 const hotspotViews: HotspotView[] = ["影视", "体育", "游戏"];
@@ -319,7 +344,7 @@ function isPolicyEvidence(item: Evidence) {
 
 function isGrowthEvidence(item: Evidence) {
   const text = `${item.title} ${item.summary} ${item.originalTitle ?? ""} ${item.platformObject ?? ""}`.toLowerCase();
-  return item.sourceType === "需求触发市场" || /netflix|bbc|iplayer|hulu|disney|espn|world cup|f1|steam|game|stream|sports/.test(text);
+  return item.sourceType === "需求触发市场" || Boolean(item.hotspotType) || /netflix|bbc|iplayer|hulu|disney|espn|world cup|f1|steam|game|stream|sports/.test(text);
 }
 
 function sortByTime<T extends { time?: string; updatedAt?: string }>(items: T[]) {
@@ -367,7 +392,7 @@ function extractNeedText(item: Evidence) {
 function createGrowthHotspots(evidence: Evidence[], themes: Theme[], sources: SourceRule[]) {
   const movieSignals = [
     ...themes.filter((theme) => /bbc|iplayer|netflix|hulu|disney|流媒体|影视/i.test(`${theme.title} ${theme.platform}`)),
-    ...evidence.filter((item) => /netflix|bbc|iplayer|hulu|disney|stream|影视|流媒体/i.test(`${item.title} ${item.summary}`)).slice(0, 3).map(themeFromEvidence),
+    ...evidence.filter((item) => item.hotspotType === "影视" || /netflix|bbc|iplayer|hulu|disney|stream|影视|流媒体/i.test(`${item.title} ${item.summary}`)).slice(0, 3).map(themeFromEvidence),
   ].slice(0, 5);
   const sportsSignals = [
     ...themes.filter((theme) => /world cup|f1|espn|体育|赛事/i.test(`${theme.title} ${theme.platform}`)),
@@ -489,6 +514,8 @@ function EvidenceCard({ item, compact = false }: { item: Evidence; compact?: boo
         </Badge>
         <Badge className="border-zinc-200 bg-white text-zinc-600">{sourceQuality(item)}</Badge>
         {item.vpnRelevance && <Badge className="border-cyan-200 bg-cyan-50 text-cyan-700">{item.vpnRelevance}</Badge>}
+        {item.collectionProfileName && <Badge className="border-indigo-200 bg-indigo-50 text-indigo-700">{item.collectionProfileName}</Badge>}
+        {item.collectionKeyword && <Badge className="border-zinc-200 bg-white text-zinc-600">关键词: {item.collectionKeyword}</Badge>}
       </div>
       <h3 className={`${compact ? "text-base" : "text-lg"} mt-3 break-words font-semibold text-zinc-950`}>{item.title}</h3>
       <p className="mt-2 break-words text-sm leading-6 text-zinc-600">{compact ? extractNeedText(item) : item.summary}</p>
@@ -496,8 +523,34 @@ function EvidenceCard({ item, compact = false }: { item: Evidence; compact?: boo
         <span>{item.source}</span>
         <span>{item.time}</span>
       </div>
+      {item.collectionRule && <p className="mt-2 text-xs leading-5 text-zinc-500">收录口径：{item.collectionRule}</p>}
       <SourceDisclosure item={item} />
     </article>
+  );
+}
+
+function ProfileMethodPanel({ profiles }: { profiles: CollectionProfile[] }) {
+  if (profiles.length === 0) return null;
+  return (
+    <section className="rounded-md border border-zinc-200 bg-white p-4">
+      <h3 className="font-semibold">专题采集方法</h3>
+      <div className="mt-4 grid gap-4">
+        {profiles.map((profile) => (
+          <article key={profile.id} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
+            <div className="flex flex-wrap gap-2">
+              <Badge className="border-teal-200 bg-teal-50 text-teal-700">{profile.name}</Badge>
+              <Badge className="border-zinc-200 bg-white text-zinc-600">{sourceFrequencyLabel(profile.frequency)}</Badge>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-zinc-600">{profile.summaryRule}</p>
+            <div className="mt-3 grid gap-2 text-xs text-zinc-500">
+              <p>必检索链接：{profile.requiredUrls.length || "无，使用关键词搜索"}</p>
+              <p>逐一搜索关键词：{profile.searchKeywords.length}</p>
+              <p className="break-words">关键词样例：{profile.searchKeywords.slice(0, 6).join(" / ")}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -550,7 +603,10 @@ export default function Home() {
   }, [opportunityEdits, opportunityReady]);
 
   const sourceStats = useMemo(() => buildSourceStats(managedSources), [managedSources]);
-  const todayScheduledSources = managedSources.filter(shouldCrawlToday).length;
+  const growthProfiles = collectionProfiles.filter((profile) => profile.panel === "增长热点");
+  const policyProfiles = collectionProfiles.filter((profile) => profile.panel === "政策风险");
+  const profileTaskCount = collectionProfiles.reduce((sum, profile) => sum + profile.requiredUrls.length + profile.searchKeywords.length, 0);
+  const todayScheduledSources = managedSources.filter(shouldCrawlToday).length + profileTaskCount;
   const activeSourceCount = managedSources.filter((source) => source.frequency !== "manual" && source.frequency !== "paused").length;
   const competitorItems = sortByTime(intelligence.evidence.filter(isCompetitorEvidence)).slice(0, 10);
   const userVoiceItems = sortByTime(intelligence.evidence.filter(isUserVoiceEvidence)).slice(0, 10);
@@ -813,10 +869,11 @@ export default function Home() {
                     </div>
                   }
                 />
-                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                <div className="mt-5 grid gap-3 md:grid-cols-4">
                   <Metric label="影视信源" value={managedSources.filter((source) => /影视|流媒体|netflix|bbc|hulu|disney/i.test(`${source.name} ${source.secondaryCategory} ${source.url}`)).length} />
                   <Metric label="体育信源" value={managedSources.filter((source) => /体育|赛事|f1|world cup|espn/i.test(`${source.name} ${source.secondaryCategory} ${source.url}`)).length} />
                   <Metric label="游戏信源" value={managedSources.filter((source) => /游戏|电竞|steamdb|steam|gaming/i.test(`${source.name} ${source.secondaryCategory} ${source.url}`)).length} />
+                  <Metric label="专题任务" value={growthProfiles.reduce((sum, profile) => sum + profile.requiredUrls.length + profile.searchKeywords.length, 0)} />
                 </div>
               </section>
 
@@ -838,6 +895,8 @@ export default function Home() {
                   </article>
                 ))}
               </section>
+
+              <ProfileMethodPanel profiles={growthProfiles} />
             </div>
           )}
 
@@ -850,10 +909,11 @@ export default function Home() {
                   summary="只保留与 VPN 技术、隐私、年龄验证、平台访问限制直接相关的政策信息。重复报道会被合并，优先采用政府、监管机构或官方组织来源。"
                   right={<Badge className="border-rose-200 bg-rose-50 text-rose-700">官方政策信源 {officialPolicySources}</Badge>}
                 />
-                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                <div className="mt-5 grid gap-3 md:grid-cols-4">
                   <Metric label="去重后风险" value={policyItems.length} />
                   <Metric label="官方来源" value={officialPolicySources} />
                   <Metric label="今日排期" value={managedSources.filter((source) => inferSourcePanel(source) === "政策风险" && shouldCrawlToday(source)).length} />
+                  <Metric label="专题任务" value={policyProfiles.reduce((sum, profile) => sum + profile.requiredUrls.length + profile.searchKeywords.length, 0)} />
                 </div>
               </section>
 
@@ -861,6 +921,8 @@ export default function Home() {
                 {policyItems.map((item) => <EvidenceCard key={item.id} item={item} />)}
                 {policyItems.length === 0 && <div className="rounded-md border border-zinc-200 bg-white p-6 text-sm text-zinc-500">暂无新的政策风险。</div>}
               </section>
+
+              <ProfileMethodPanel profiles={policyProfiles} />
             </div>
           )}
 
@@ -983,10 +1045,11 @@ export default function Home() {
                     </div>
                   }
                 />
-                <div className="mt-5 grid gap-3 md:grid-cols-4">
+                <div className="mt-5 grid gap-3 md:grid-cols-5">
                   <Metric label="全部信源" value={managedSources.length} />
                   <Metric label="启用信源" value={activeSourceCount} />
                   <Metric label="今日排期" value={todayScheduledSources} />
+                  <Metric label="专题任务" value={profileTaskCount} />
                   <Metric label="抓取异常" value={intelligence.status.sourcesWaitingReview} />
                 </div>
                 {sourceNotice && <p className="mt-4 rounded-md bg-teal-50 p-3 text-sm font-semibold text-teal-800">{sourceNotice}</p>}

@@ -1,0 +1,102 @@
+{
+  "profiles": [
+    {
+      "id": "streaming-platform-dynamics",
+      "name": "流媒体平台动态",
+      "panel": "增长热点",
+      "sourceType": "需求触发市场",
+      "hotspotType": "影视",
+      "frequency": "daily",
+      "requiredUrls": [
+        "https://www.streamtvinsider.com/",
+        "https://about.netflix.com/newsroom",
+        "https://www.aboutamazon.com/amazon-news-today",
+        "https://press.wbd.com/us/brands/hbo-max"
+      ],
+      "searchKeywords": [
+        "Netflix price increase",
+        "Disney+ price",
+        "streaming subscription",
+        "streaming price increase",
+        "streaming regional availability",
+        "sports streaming rights"
+      ],
+      "includeKeywords": [
+        "price",
+        "subscription",
+        "regional availability",
+        "sports rights",
+        "ad-supported",
+        "household",
+        "sharing",
+        "region",
+        "availability",
+        "distribution",
+        "rights",
+        "streaming"
+      ],
+      "excludeKeywords": [
+        "trailer",
+        "cast",
+        "episode recap",
+        "celebrity",
+        "poster",
+        "teaser"
+      ],
+      "summaryRule": "只收录与定价、分发、区域供给、跨区访问、赛事版权或访问规则变化直接相关的流媒体信息。"
+    },
+    {
+      "id": "social-platform-region-dynamics",
+      "name": "社交平台区域动态",
+      "panel": "政策风险",
+      "sourceType": "政策监管",
+      "hotspotType": "社交平台",
+      "frequency": "daily",
+      "requiredUrls": [],
+      "searchKeywords": [
+        "TikTok ban",
+        "Instagram new feature region",
+        "social media regional restriction",
+        "social media age verification",
+        "platform regional rollout",
+        "Facebook",
+        "Instagram",
+        "YouTube",
+        "TikTok",
+        "X",
+        "Snapchat",
+        "LinkedIn",
+        "Reddit",
+        "Discord",
+        "Pinterest"
+      ],
+      "includeKeywords": [
+        "ban",
+        "regional",
+        "restriction",
+        "age verification",
+        "rollout",
+        "availability",
+        "country",
+        "market",
+        "blocked",
+        "access",
+        "registration",
+        "download",
+        "subscription",
+        "pricing",
+        "minor",
+        "teen"
+      ],
+      "excludeKeywords": [
+        "emoji",
+        "ui redesign",
+        "global launch",
+        "creator tips",
+        "viral trend",
+        "celebrity"
+      ],
+      "summaryRule": "只收录区域功能差异、访问/注册限制、订阅区域差异、年龄验证和未成年人保护等会影响跨区访问或合规风险的信息。"
+    }
+  ]
+}

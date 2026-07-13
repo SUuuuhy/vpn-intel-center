@@ -3,7 +3,9 @@ import { readFile, writeFile } from "node:fs/promises";
 
 const DATA_PATH = new URL("../data/intelligence.json", import.meta.url);
 const RULES_PATH = new URL("../data/source-rules.json", import.meta.url);
+const PROFILES_PATH = new URL("../data/collection-profiles.json", import.meta.url);
 const MAX_ITEMS_PER_SOURCE = 8;
+const MAX_PROFILE_ANCHORS = 18;
 const MAX_HISTORY_ITEMS = 180;
 const FETCH_TIMEOUT_MS = 12000;
 const MAX_CONCURRENT_FETCHES = 6;
@@ -16,6 +18,7 @@ const PANEL_LIMITS = {
 };
 const dryRun = process.argv.includes("--dry-run");
 const sanitizeOnly = process.argv.includes("--sanitize-only");
+const profilesOnly = process.argv.includes("--profiles-only");
 
 const now = new Date();
 const generatedAt = now.toISOString();
@@ -28,7 +31,10 @@ const displayDate = new Intl.DateTimeFormat("en-CA", {
 
 const data = JSON.parse(await readFile(DATA_PATH, "utf8"));
 const rules = JSON.parse(await readFile(RULES_PATH, "utf8"));
-const scheduledSources = selectScheduledSources(rules.sources, now);
+const collectionProfiles = JSON.parse(await readFile(PROFILES_PATH, "utf8")).profiles ?? [];
+const profileSources = buildProfileSources(collectionProfiles);
+const allSources = [...rules.sources, ...profileSources];
+const scheduledSources = selectScheduledSources(profilesOnly ? profileSources : allSources, now);
 
 const existingEvidenceIds = new Set(data.evidence.map((item) => item.id));
 const fetchedEvidence = [];
@@ -38,7 +44,12 @@ if (!sanitizeOnly) {
   const results = await mapWithConcurrency(scheduledSources, MAX_CONCURRENT_FETCHES, async (source) => {
     try {
       const text = await fetchText(source.url);
-      const items = source.mode === "rss" ? parseRss(text) : parseHtmlTitle(text, source.url);
+      const items =
+        source.mode === "rss"
+          ? parseRss(text)
+          : source.mode === "html-deep"
+            ? await parseHtmlDeep(text, source.url)
+            : parseHtmlTitle(text, source.url);
       return {
         source,
         items: items.slice(0, MAX_ITEMS_PER_SOURCE).map((item) => classifyItem(item, source, rules.keywords)).filter(Boolean),
@@ -109,8 +120,63 @@ if (failures.length > 0) {
   console.warn("Some sources failed:", JSON.stringify(failures));
 }
 console.log(
-  `${dryRun ? "Dry run:" : sanitizeOnly ? "Sanitized" : "Updated"} ${dedupedFetchedEvidence.length} new evidence items for ${displayDate}. Checked ${scheduledSources.length}/${rules.sources.length} scheduled sources.`,
+  `${dryRun ? "Dry run:" : sanitizeOnly ? "Sanitized" : "Updated"} ${dedupedFetchedEvidence.length} new evidence items for ${displayDate}. Checked ${scheduledSources.length}/${profilesOnly ? profileSources.length : allSources.length} scheduled sources.`,
 );
+
+function buildProfileSources(profiles) {
+  return profiles.flatMap((profile) => {
+    const requiredSources = profile.requiredUrls.map((url, index) => ({
+      id: `profile-${profile.id}-required-${index + 1}`,
+      name: `${profile.name} - 必检索 ${index + 1}`,
+      category: profile.sourceType,
+      secondaryCategory: profile.name,
+      granularity: "页面级",
+      market: "Global",
+      competitor: "",
+      scene: profile.name,
+      isCore: true,
+      crawlMethod: "HTML",
+      url,
+      mode: "html-deep",
+      frequency: profile.frequency ?? "daily",
+      panel: profile.panel,
+      hotspotType: profile.hotspotType,
+      collectionProfile: profile.id,
+      collectionProfileName: profile.name,
+      collectionRule: profile.summaryRule,
+      includeKeywords: profile.includeKeywords ?? [],
+      excludeKeywords: profile.excludeKeywords ?? [],
+    }));
+    const searchSources = profile.searchKeywords.map((keyword, index) => ({
+      id: `profile-${profile.id}-search-${index + 1}`,
+      name: `${profile.name} - ${keyword}`,
+      category: profile.sourceType,
+      secondaryCategory: `${profile.name}关键词搜索`,
+      granularity: "关键词级",
+      market: "Global",
+      competitor: "",
+      scene: profile.name,
+      isCore: true,
+      crawlMethod: "RSS",
+      url: googleNewsRssUrl(`${keyword} when:1d`),
+      mode: "rss",
+      frequency: profile.frequency ?? "daily",
+      panel: profile.panel,
+      hotspotType: profile.hotspotType,
+      collectionProfile: profile.id,
+      collectionProfileName: profile.name,
+      collectionKeyword: keyword,
+      collectionRule: profile.summaryRule,
+      includeKeywords: profile.includeKeywords ?? [],
+      excludeKeywords: profile.excludeKeywords ?? [],
+    }));
+    return [...requiredSources, ...searchSources];
+  });
+}
+
+function googleNewsRssUrl(query) {
+  return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+}
 
 async function mapWithConcurrency(items, limit, task) {
   const results = [];
@@ -150,6 +216,7 @@ function shouldCrawlSource(source, date) {
   const frequency = String(source.frequency || "daily").toLowerCase();
   if (frequency === "paused" || frequency === "manual") return false;
   const panel = inferSourcePanel(source);
+  if (source.collectionProfile) return true;
   if (panel === "政策风险") return isOfficialPolicySource(source) && (frequency !== "weekly" || shanghaiWeekday(date) === "Mon");
   if (panel === "竞品情报" || panel === "用户声音" || panel === "增长热点") return true;
   if (frequency === "weekly") return shanghaiWeekday(date) === "Mon";
@@ -157,6 +224,7 @@ function shouldCrawlSource(source, date) {
 }
 
 function inferSourcePanel(source) {
+  if (source.panel) return source.panel;
   const category = normalizeSourceCategory(source.category);
   const text = `${source.name} ${source.secondaryCategory} ${source.scene} ${source.url}`.toLowerCase();
   if (category === "政策监管") return "政策风险";
@@ -171,7 +239,8 @@ function sourcePriority(source, panel) {
   const coreScore = source.isCore ? 8 : 0;
   const officialScore = isOfficialCompetitorSource(source) || isOfficialPolicySource(source) ? 6 : 0;
   const panelScore = panel === "政策风险" && isOfficialPolicySource(source) ? 10 : 0;
-  return coreScore + officialScore + panelScore + methodScore;
+  const profileScore = source.collectionProfile ? 12 : 0;
+  return coreScore + officialScore + panelScore + profileScore + methodScore;
 }
 
 function isOfficialCompetitorSource(source) {
@@ -288,6 +357,88 @@ function parseRss(xml) {
 function parseHtmlTitle(html, url) {
   const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? url;
   return [{ title: cleanXml(title), link: url, summary: "", publishedAt: generatedAt }];
+}
+
+async function parseHtmlDeep(html, url) {
+  const anchors = parseHtmlAnchors(html, url).slice(0, MAX_PROFILE_ANCHORS);
+  const detailResults = await mapWithConcurrency(anchors, 4, async (anchor) => {
+    try {
+      const articleHtml = await fetchText(anchor.link);
+      const title = readHtmlTitle(articleHtml) || anchor.title;
+      const summary = readMeta(articleHtml, "description") || readMeta(articleHtml, "og:description") || anchor.summary;
+      const publishedAt =
+        readMeta(articleHtml, "article:published_time") ||
+        readMeta(articleHtml, "date") ||
+        readMeta(articleHtml, "pubdate") ||
+        readTimeTag(articleHtml) ||
+        "";
+      return {
+        title: cleanSummary(title, anchor.title),
+        link: anchor.link,
+        summary: cleanSummary(summary, title),
+        publishedAt,
+      };
+    } catch {
+      return anchor;
+    }
+  });
+  return detailResults.filter((item) => item.title);
+}
+
+function parseHtmlAnchors(html, baseUrl) {
+  const baseHost = safeHost(baseUrl);
+  const seen = new Set();
+  return [...html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)]
+    .map((match) => {
+      const link = resolveUrl(match[1], baseUrl);
+      const title = cleanSummary(match[2], "");
+      return { title, link, summary: "", publishedAt: "" };
+    })
+    .filter((item) => {
+      if (!item.link || !item.title || item.title.length < 8) return false;
+      if (seen.has(item.link)) return false;
+      seen.add(item.link);
+      const host = safeHost(item.link);
+      if (host && baseHost && host !== baseHost) return false;
+      return isLikelyArticleUrl(item.link, item.title);
+    });
+}
+
+function readHtmlTitle(html) {
+  return cleanXml(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "");
+}
+
+function readMeta(html, name) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const direct = new RegExp(`<meta[^>]+(?:name|property)=["']${escaped}["'][^>]+content=["']([^"']+)["'][^>]*>`, "i");
+  const reversed = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:name|property)=["']${escaped}["'][^>]*>`, "i");
+  return cleanXml(html.match(direct)?.[1] ?? html.match(reversed)?.[1] ?? "");
+}
+
+function readTimeTag(html) {
+  return cleanXml(html.match(/<time[^>]+datetime=["']([^"']+)["'][^>]*>/i)?.[1] ?? "");
+}
+
+function resolveUrl(href, baseUrl) {
+  try {
+    return new URL(href, baseUrl).href.split("#")[0];
+  } catch {
+    return "";
+  }
+}
+
+function safeHost(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+function isLikelyArticleUrl(url, title) {
+  const text = `${url} ${title}`.toLowerCase();
+  if (/privacy|terms|subscribe|newsletter|login|signin|account|advertise|contact|about-us|category|tag\//.test(text)) return false;
+  return /\/20\d{2}\/|\/news\/|\/article\/|\/press|\/blog\/|\/brands\/|\/amazon-news|netflix\.com\/newsroom|streamtvinsider\.com/.test(text);
 }
 
 function readTag(xml, tag) {
@@ -514,7 +665,9 @@ function googleSearchUrl(query) {
 function classifyItem(item, source, keywords) {
   const text = `${item.title} ${item.summary}`.toLowerCase();
   const sourcePanel = inferSourcePanel(source);
-  if (sourcePanel === "政策风险" && !isOfficialPolicySource(source)) return null;
+  if (sourcePanel === "政策风险" && !isOfficialPolicySource(source) && !source.collectionProfile) return null;
+  if (source.collectionProfile && !profileMatchesItem(item, source)) return null;
+  if (source.collectionProfile && !isFreshProfileItem(item)) return null;
 
   const relevance = scoreVpnRelevance(text, source, keywords, sourcePanel);
   if (relevance.score < relevance.minScore) return null;
@@ -546,11 +699,31 @@ function classifyItem(item, source, keywords) {
     sourcePanel,
     vpnRelevance: relevance.label,
     displayPriority: relevance.priority,
+    collectionProfile: source.collectionProfile,
+    collectionProfileName: source.collectionProfileName,
+    collectionKeyword: source.collectionKeyword,
+    collectionRule: source.collectionRule,
+    hotspotType: source.hotspotType,
     source: source.name,
     summary: buildChineseSummary(rawTitle, rawSummary, source, themeId, role),
     time,
     url: item.link || source.url,
   };
+}
+
+function profileMatchesItem(item, source) {
+  const text = `${item.title} ${item.summary}`.toLowerCase();
+  if ((source.excludeKeywords ?? []).some((keyword) => text.includes(String(keyword).toLowerCase()))) return false;
+  if ((source.includeKeywords ?? []).length === 0) return true;
+  return source.includeKeywords.some((keyword) => text.includes(String(keyword).toLowerCase()));
+}
+
+function isFreshProfileItem(item) {
+  if (!item.publishedAt) return true;
+  const published = new Date(item.publishedAt);
+  if (Number.isNaN(published.getTime())) return true;
+  const ageMs = now.getTime() - published.getTime();
+  return ageMs >= 0 && ageMs <= 36 * 60 * 60 * 1000;
 }
 
 function scoreVpnRelevance(text, source, keywords, panel) {
