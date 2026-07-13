@@ -4,14 +4,10 @@ import intelligenceData from "@/data/intelligence.json";
 import sourceRulesData from "@/data/source-rules.json";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
-type Trend = "新出现" | "升温" | "稳定" | "降温" | "样本不足";
 type Priority = "高" | "中" | "低";
-type MaturityLevel = "L0" | "L1" | "L2" | "L3" | "L4" | "L5";
-type DisplayPriority = "P0" | "P1" | "P2" | "P3";
-type SourceWeight = "高" | "中" | "中低" | "低";
-type ThemeType = "需求型" | "动作型";
-type ReviewStatus = "系统建议" | "待确认" | "已人工确认";
-type LinkQuality = "原始链接" | "搜索页" | "新闻聚合" | "待解析";
+type Trend = "新出现" | "升温" | "稳定" | "降温" | "样本不足";
+type PanelView = "竞品情报" | "用户声音" | "增长热点" | "政策风险" | "历史信息库" | "潜在机会" | "信息源管理";
+type HotspotView = "影视" | "体育" | "游戏";
 
 type SourceRule = {
   id: string;
@@ -33,6 +29,13 @@ type SourceRuleInput = Partial<Omit<SourceRule, "isCore">> & {
   isCore?: boolean | string | number;
 };
 
+type SourceRulesData = {
+  timezone: string;
+  marketFocus: string[];
+  keywords: Record<string, string[]>;
+  sources: SourceRule[];
+};
+
 type BriefingItem = {
   id: string;
   period: "daily" | "weekly";
@@ -50,7 +53,7 @@ type BriefingItem = {
 
 type Theme = {
   id: string;
-  type: ThemeType;
+  type: "需求型" | "动作型";
   title: string;
   summary: string;
   market: string;
@@ -82,16 +85,18 @@ type Evidence = {
   platformObject?: string;
   rawNeed?: string;
   discussionHeat?: string;
-  reviewStatus?: ReviewStatus;
+  displayPriority?: string;
+  sourcePanel?: string;
+  vpnRelevance?: string;
 };
 
 type Opportunity = {
   id: string;
   themeId: string;
   title: string;
-  type: "短期机会" | "中长期机会";
-  feasibility: "可行" | "待验证" | "不可行";
-  status: "待评估" | "验证中" | "已立项" | "执行中" | "已完成" | "暂缓";
+  type: string;
+  feasibility: string;
+  status: string;
   actions: string[];
   cycle: string;
   nextStep: string;
@@ -105,29 +110,6 @@ type SourceStat = {
   freq: string;
   color: string;
 };
-
-type ThemeRelation = {
-  leftThemeId: string;
-  rightThemeId: string;
-  level: string;
-  reason: string;
-};
-
-type ManualReview = {
-  themeId: string;
-  priority: Priority;
-  rating: Priority;
-  demandStrength: Priority;
-  competitorResponse: Priority;
-  actionability: Priority;
-  risk: Priority;
-  relationDecision: "已确认" | "待确认" | "不关联";
-  opportunityDecision: "进入机会池" | "继续观察" | "暂不处理";
-  actions: string[];
-  note: string;
-};
-
-type ManualReviewState = Record<string, ManualReview>;
 
 type IntelligenceData = {
   generatedAt: string;
@@ -144,359 +126,40 @@ type IntelligenceData = {
   briefingItems: BriefingItem[];
   themes: Theme[];
   evidence: Evidence[];
-  themeRelations: ThemeRelation[];
   opportunities: Opportunity[];
-  manualReviews?: ManualReview[];
 };
 
-type SourceRulesData = {
-  timezone: string;
-  marketFocus: string[];
-  keywords: Record<string, string[]>;
-  sources: SourceRule[];
+type OpportunityEdit = {
+  rating: Priority;
+  status: string;
+  note: string;
 };
 
 const intelligence = intelligenceData as IntelligenceData;
 const sourceRules = sourceRulesData as SourceRulesData;
 
-const sourceCategoryOrder = ["竞品情报", "用户声音", "SEO搜索", "第三方媒体", "政策监管", "需求触发市场"];
-const sourceCategoryMeta: Record<string, Pick<SourceStat, "freq" | "color">> = {
-  "竞品情报": { freq: "按页/账号分频", color: "bg-teal-500" },
-  "用户声音": { freq: "每日", color: "bg-indigo-500" },
-  "SEO搜索": { freq: "每周2-3次", color: "bg-cyan-500" },
-  "第三方媒体": { freq: "每周1-2次", color: "bg-amber-500" },
-  "政策监管": { freq: "每周/事件加频", color: "bg-rose-500" },
-  "需求触发市场": { freq: "按对象分频", color: "bg-emerald-500" },
-};
-const configuredSourceStats = buildSourceStats(sourceRules.sources);
-
-const briefingItems: BriefingItem[] = [
-  {
-    id: "b1",
-    period: "daily",
-    type: "需求信号",
-    title: "美国用户想观看 BBC iPlayer，但受地区版权限制",
-    summary: "Reddit 与搜索结果同时出现 BBC iPlayer 访问受限讨论，核心证据在 24 小时内新增 4 条。",
-    priority: "高",
-    trend: "升温",
-    evidence: 8,
-    source: "Reddit / SEO",
-    time: "今日 09:20",
-  },
-  {
-    id: "b2",
-    period: "daily",
-    type: "竞品动作",
-    title: "NordVPN通过SEO教程布局 BBC iPlayer 访问场景",
-    summary: "竞品新增教程内容并在搜索结果中进入前列，与升温需求主题存在强关联。",
-    priority: "高",
-    trend: "新出现",
-    evidence: 5,
-    source: "竞品官网 / SERP",
-    time: "今日 08:40",
-  },
-  {
-    id: "b3",
-    period: "daily",
-    type: "外部变化",
-    title: "英国年龄验证政策相关讨论继续扩散",
-    summary: "政策与媒体信源出现多条 VPN、隐私、安全访问相关内容，标记为风险高但机会不降级。",
-    priority: "高",
-    trend: "升温",
-    evidence: 6,
-    source: "政策监管 / 媒体",
-    time: "今日 07:10",
-  },
-  {
-    id: "b4",
-    period: "weekly",
-    type: "需求信号",
-    title: "德国用户想订阅美国流媒体，但受支付地区限制",
-    summary: "本周核心证据从 2 条增至 6 条，平台规则和用户讨论均指向支付地区限制。",
-    priority: "高",
-    trend: "升温",
-    evidence: 6,
-    source: "UGC / 平台规则",
-    time: "本周",
-  },
-  {
-    id: "b5",
-    period: "weekly",
-    type: "竞品动作",
-    title: "Surfshark通过价格活动布局家庭订阅用户",
-    summary: "价格页、社媒和第三方评测站均出现家庭订阅与折扣内容，建议进入活动策略观察。",
-    priority: "高",
-    trend: "升温",
-    evidence: 7,
-    source: "竞品情报 / 媒体",
-    time: "本周",
-  },
-  {
-    id: "b6",
-    period: "weekly",
-    type: "待处理",
-    title: "3 个强关联主题等待人工确认",
-    summary: "系统识别出需求升温与竞品动作同步出现，需增长负责人确认是否进入机会池。",
-    priority: "高",
-    trend: "稳定",
-    evidence: 3,
-    source: "主题关联",
-    time: "本周",
-  },
-];
-
-const themes: Theme[] = [
-  {
-    id: "d1",
-    type: "需求型",
-    title: "美国用户想观看 BBC iPlayer，但受地区版权限制",
-    summary: "用户在美国访问英国流媒体时遇到地区限制，讨论集中在可用英国节点与 VPN 检测问题。",
-    market: "美国",
-    platform: "BBC iPlayer",
-    competitor: "多竞品",
-    trend: "升温",
-    priority: "高",
-    currentEvidence: 8,
-    previousEvidence: 3,
-    coreEvidence: 8,
-    referenceInfo: 5,
-    linkedThemes: 2,
-    updatedAt: "2026-07-10",
-  },
-  {
-    id: "d2",
-    type: "需求型",
-    title: "德国用户想订阅美国流媒体，但受支付地区限制",
-    summary: "用户尝试跨区订阅时遇到支付方式、账单地址和账户地区限制，关联平台规则变化。",
-    market: "德国",
-    platform: "Hulu / Disney+",
-    competitor: "ExpressVPN",
-    trend: "升温",
-    priority: "高",
-    currentEvidence: 6,
-    previousEvidence: 2,
-    coreEvidence: 6,
-    referenceInfo: 3,
-    linkedThemes: 1,
-    updatedAt: "2026-07-09",
-  },
-  {
-    id: "d3",
-    type: "需求型",
-    title: "英国用户想保护浏览隐私，但受公共网络安全风险影响",
-    summary: "公共 Wi-Fi 与数据隐私内容稳定出现，但最近 7 天核心证据不足以判断升温。",
-    market: "英国",
-    platform: "公共网络",
-    competitor: "Proton VPN",
-    trend: "样本不足",
-    priority: "中",
-    currentEvidence: 2,
-    previousEvidence: 1,
-    coreEvidence: 2,
-    referenceInfo: 4,
-    linkedThemes: 1,
-    updatedAt: "2026-07-08",
-  },
-  {
-    id: "a1",
-    type: "动作型",
-    title: "NordVPN通过SEO教程布局 BBC iPlayer 访问场景",
-    summary: "竞品围绕 BBC iPlayer 更新教程页，并在搜索结果中获得更高可见度。",
-    market: "美国 / 英国",
-    platform: "BBC iPlayer",
-    competitor: "NordVPN",
-    trend: "新出现",
-    priority: "高",
-    currentEvidence: 5,
-    previousEvidence: 0,
-    coreEvidence: 5,
-    referenceInfo: 2,
-    linkedThemes: 1,
-    updatedAt: "2026-07-10",
-  },
-  {
-    id: "a2",
-    type: "动作型",
-    title: "Surfshark通过价格活动布局家庭订阅用户",
-    summary: "竞品页面和社媒同时强化家庭订阅、折扣和多人设备权益表达。",
-    market: "北美 / 西欧",
-    platform: "价格页",
-    competitor: "Surfshark",
-    trend: "升温",
-    priority: "高",
-    currentEvidence: 7,
-    previousEvidence: 3,
-    coreEvidence: 7,
-    referenceInfo: 4,
-    linkedThemes: 2,
-    updatedAt: "2026-07-09",
-  },
-  {
-    id: "a3",
-    type: "动作型",
-    title: "ExpressVPN通过YouTube内容布局流媒体解锁场景",
-    summary: "官方视频新增流媒体访问内容，但暂未形成足够多来源证据。",
-    market: "全球",
-    platform: "YouTube",
-    competitor: "ExpressVPN",
-    trend: "稳定",
-    priority: "中",
-    currentEvidence: 4,
-    previousEvidence: 4,
-    coreEvidence: 4,
-    referenceInfo: 1,
-    linkedThemes: 1,
-    updatedAt: "2026-07-07",
-  },
-];
-
-const evidence: Evidence[] = [
-  {
-    id: "e1",
-    role: "核心证据",
-    themeId: "d1",
-    title: "Reddit 讨论：美国用户询问 BBC iPlayer 可用 VPN",
-    sourceType: "用户声音",
-    source: "Reddit",
-    summary: "用户明确表达在美国访问 BBC iPlayer 失败，并询问可用英国节点。",
-    time: "2026-07-10 09:20",
-  },
-  {
-    id: "e2",
-    role: "核心证据",
-    themeId: "d1",
-    title: "SERP 变化：VPN for BBC iPlayer 新页面进入前 10",
-    sourceType: "SEO搜索",
-    source: "Google SERP",
-    summary: "核心关键词前 10 中新增两条教程型页面，说明该场景流量竞争增强。",
-    time: "2026-07-10 08:55",
-  },
-  {
-    id: "e3",
-    role: "核心证据",
-    themeId: "a1",
-    title: "NordVPN 更新 BBC iPlayer 教程页",
-    sourceType: "竞品情报",
-    source: "NordVPN",
-    summary: "页面标题、教程结构和英国节点说明出现更新，匹配动作型主题。",
-    time: "2026-07-10 08:40",
-  },
-  {
-    id: "e4",
-    role: "参考信息",
-    themeId: "d1",
-    title: "第三方媒体提到 BBC iPlayer 海外访问限制",
-    sourceType: "第三方媒体",
-    source: "VPN review site",
-    summary: "文章提及海外观看限制，但用户所在国家不明确，因此只挂为参考。",
-    time: "2026-07-09 18:10",
-  },
-  {
-    id: "e5",
-    role: "核心证据",
-    themeId: "a2",
-    title: "Surfshark 价格页突出家庭设备覆盖",
-    sourceType: "竞品情报",
-    source: "Surfshark pricing",
-    summary: "套餐页新增家庭场景表达，与折扣活动共同构成竞品动作证据。",
-    time: "2026-07-09 16:30",
-  },
-];
-
-const opportunities: Opportunity[] = [
-  {
-    id: "o1",
-    themeId: "d1",
-    title: "BBC iPlayer 访问需求验证",
-    type: "短期机会",
-    feasibility: "待验证",
-    status: "验证中",
-    actions: ["产品能力验证", "SEO页面", "内容选题"],
-    cycle: "先用1-3天验证英国节点，再进入2-4周SEO页面建设",
-    nextStep: "验证英国节点播放稳定性与 VPN 检测情况",
-    owner: "增长PM",
-  },
-  {
-    id: "o2",
-    themeId: "d2",
-    title: "德国跨区订阅限制内容机会",
-    type: "中长期机会",
-    feasibility: "待验证",
-    status: "待评估",
-    actions: ["内容选题", "落地页优化", "客服/运营响应"],
-    cycle: "1-2周完成内容验证，后续按月观察搜索需求",
-    nextStep: "梳理支付地区限制 FAQ 与可合规表达边界",
-    owner: "内容运营",
-  },
-  {
-    id: "o3",
-    themeId: "a2",
-    title: "家庭订阅价格活动跟进",
-    type: "短期机会",
-    feasibility: "可行",
-    status: "待评估",
-    actions: ["价格/活动策略", "落地页优化"],
-    cycle: "3-7天完成竞品价格表达与活动页对比",
-    nextStep: "对比核心竞品折扣表达和设备权益表述",
-    owner: "增长运营",
-  },
-];
-
-const trendStyles: Record<Trend, string> = {
-  "新出现": "bg-cyan-50 text-cyan-700 border-cyan-200",
-  "升温": "bg-rose-50 text-rose-700 border-rose-200",
-  "稳定": "bg-emerald-50 text-emerald-700 border-emerald-200",
-  "降温": "bg-zinc-100 text-zinc-700 border-zinc-200",
-  "样本不足": "bg-amber-50 text-amber-800 border-amber-200",
-};
-
-const priorityStyles: Record<Priority, string> = {
-  "高": "bg-red-600 text-white",
-  "中": "bg-amber-500 text-zinc-950",
-  "低": "bg-zinc-200 text-zinc-700",
-};
-
-const maturityStyles: Record<MaturityLevel, string> = {
-  L0: "border-zinc-200 bg-zinc-50 text-zinc-700",
-  L1: "border-cyan-200 bg-cyan-50 text-cyan-700",
-  L2: "border-teal-200 bg-teal-50 text-teal-700",
-  L3: "border-indigo-200 bg-indigo-50 text-indigo-700",
-  L4: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  L5: "border-red-200 bg-red-50 text-red-700",
-};
-
-const displayPriorityStyles: Record<DisplayPriority, string> = {
-  P0: "border-red-200 bg-red-50 text-red-700",
-  P1: "border-amber-200 bg-amber-50 text-amber-800",
-  P2: "border-zinc-200 bg-zinc-50 text-zinc-700",
-  P3: "border-zinc-200 bg-white text-zinc-500",
-};
-
-const reviewStatusStyles: Record<ReviewStatus, string> = {
-  "系统建议": "border-zinc-200 bg-zinc-50 text-zinc-600",
-  "待确认": "border-amber-200 bg-amber-50 text-amber-800",
-  "已人工确认": "border-emerald-200 bg-emerald-50 text-emerald-700",
-};
-
-const linkQualityStyles: Record<LinkQuality, string> = {
-  "原始链接": "border-emerald-200 bg-emerald-50 text-emerald-700",
-  "搜索页": "border-amber-200 bg-amber-50 text-amber-800",
-  "新闻聚合": "border-cyan-200 bg-cyan-50 text-cyan-700",
-  "待解析": "border-zinc-200 bg-zinc-50 text-zinc-600",
-};
-
-const actionOptions = ["产品能力验证", "SEO页面", "内容选题", "落地页优化", "广告投放", "价格/活动策略", "合作渠道", "客服/运营响应"];
-const sourceCategories = sourceCategoryOrder;
+const panelViews: PanelView[] = ["竞品情报", "用户声音", "增长热点", "政策风险", "历史信息库", "潜在机会", "信息源管理"];
+const hotspotViews: HotspotView[] = ["影视", "体育", "游戏"];
+const competitorNames = ["NordVPN", "ExpressVPN", "Surfshark", "Proton VPN", "CyberGhost", "PIA VPN"];
+const sourceCategories = ["竞品情报", "用户声音", "SEO搜索", "第三方媒体", "政策监管", "需求触发市场"];
 const sourceFrequencies = ["daily", "weekly", "event", "manual", "paused"];
 const sourceCrawlMethods = ["RSS", "HTML", "API", "SERP", "Social", "Manual"];
-const sourceFrequencyLabels: Record<string, string> = {
+const categoryColors: Record<string, string> = {
+  "竞品情报": "bg-teal-500",
+  "用户声音": "bg-indigo-500",
+  "SEO搜索": "bg-cyan-500",
+  "第三方媒体": "bg-amber-500",
+  "政策监管": "bg-rose-500",
+  "需求触发市场": "bg-emerald-500",
+};
+const frequencyLabels: Record<string, string> = {
   daily: "每日",
   weekly: "每周",
   event: "事件触发",
   manual: "手动维护",
   paused: "暂停",
 };
-const sourceCrawlMethodLabels: Record<string, string> = {
+const crawlMethodLabels: Record<string, string> = {
   RSS: "RSS",
   HTML: "页面抓取",
   API: "API",
@@ -504,60 +167,91 @@ const sourceCrawlMethodLabels: Record<string, string> = {
   Social: "社媒抓取",
   Manual: "手动录入",
 };
-const competitorNames = ["NordVPN", "ExpressVPN", "Surfshark", "Proton VPN", "CyberGhost", "PIA VPN"];
-const sourceTagDefinitions = [
-  ["信源大类", "说明信息来自竞品官方、用户论坛、SEO、第三方媒体、政策监管还是需求触发市场。"],
-  ["来源形态", "说明这条信息来自官网、官方账号、论坛/社区、搜索结果、新闻聚合或媒体评测。"],
-  ["来源对象", "标记具体网站、账号、竞品或平台，例如 NordVPN、Surfshark、Reddit、Google SERP。"],
-  ["用户所在市场", "只标记发出需求或讨论的用户所在国家/地区，不用目标平台地区替代。"],
-  ["目标地区/平台", "标记用户想访问的内容、平台或地区，例如 BBC iPlayer、美国流媒体、公共 Wi-Fi。"],
-];
-
-type SourceTagInput = {
-  sourceType?: string;
-  source: string;
-  title: string;
-  summary: string;
-  originalTitle?: string;
-  url?: string;
-  userMarket?: string;
-  targetMarket?: string;
-  platformObject?: string;
+const priorityStyles: Record<Priority, string> = {
+  "高": "border-rose-200 bg-rose-50 text-rose-700",
+  "中": "border-amber-200 bg-amber-50 text-amber-800",
+  "低": "border-zinc-200 bg-zinc-50 text-zinc-600",
+};
+const trendStyles: Record<string, string> = {
+  "新出现": "border-cyan-200 bg-cyan-50 text-cyan-700",
+  "升温": "border-rose-200 bg-rose-50 text-rose-700",
+  "稳定": "border-emerald-200 bg-emerald-50 text-emerald-700",
+  "降温": "border-zinc-200 bg-zinc-50 text-zinc-600",
+  "样本不足": "border-amber-200 bg-amber-50 text-amber-800",
 };
 
-function sourceCategoryLabel(sourceType: string) {
-  if (sourceType === "平台服务生态" || sourceType === "相关平台") return "需求触发市场";
-  return sourceType;
+function sourceCategoryLabel(category: string) {
+  if (category === "用户声音（UGC）") return "用户声音";
+  if (category === "SEO 搜索结果") return "SEO搜索";
+  if (category === "政策与监管") return "政策监管";
+  if (category === "相关市场" || category === "平台服务生态" || category === "相关平台") return "需求触发市场";
+  return category;
 }
 
-function sourceFrequencyLabel(frequency: string) {
-  return sourceFrequencyLabels[frequency] ?? frequency;
+function sourceFrequencyLabel(value: string) {
+  return frequencyLabels[value] ?? value;
 }
 
-function sourceCrawlMethodLabel(method: string) {
-  return sourceCrawlMethodLabels[method] ?? method;
+function sourceCrawlMethodLabel(value: string) {
+  return crawlMethodLabels[value] ?? value;
 }
 
-function buildSourceStats(sources: SourceRule[]): SourceStat[] {
-  const counts = new Map<string, { total: number; active: number }>();
-  sources.forEach((source) => {
-    const category = sourceCategoryLabel(source.category);
-    const current = counts.get(category) ?? { total: 0, active: 0 };
-    current.total += 1;
-    if (source.frequency !== "paused" && source.frequency !== "manual") current.active += 1;
-    counts.set(category, current);
-  });
+function createEmptySourceRule(): SourceRule {
+  return {
+    id: "",
+    name: "",
+    category: "竞品情报",
+    secondaryCategory: "",
+    granularity: "站点级",
+    market: "Global",
+    competitor: "",
+    scene: "",
+    isCore: true,
+    crawlMethod: "HTML",
+    url: "",
+    mode: "html",
+    frequency: "daily",
+  };
+}
 
-  return sourceCategoryOrder.map((category) => {
-    const count = counts.get(category) ?? { total: 0, active: 0 };
-    return {
-      name: category,
-      total: count.total,
-      active: count.active,
-      freq: sourceCategoryMeta[category]?.freq ?? "按规则分频",
-      color: sourceCategoryMeta[category]?.color ?? "bg-zinc-500",
-    };
-  });
+function createSourceId(name: string, url = "") {
+  const base = `${name || url}`
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 42);
+  return base || `source-${Date.now()}`;
+}
+
+function normalizeSourceRule(input: SourceRuleInput): SourceRule {
+  const name = String(input.name ?? "").trim();
+  const url = String(input.url ?? "").trim();
+  const isCoreValue = input.isCore;
+  const crawlMethod = String(input.crawlMethod ?? "HTML").trim();
+
+  return {
+    ...createEmptySourceRule(),
+    ...input,
+    id: String(input.id ?? "").trim() || createSourceId(name, url),
+    name,
+    category: sourceCategoryLabel(String(input.category ?? "竞品情报").trim()),
+    secondaryCategory: String(input.secondaryCategory ?? "").trim(),
+    granularity: String(input.granularity ?? "站点级").trim(),
+    market: String(input.market ?? "Global").trim(),
+    competitor: String(input.competitor ?? "").trim(),
+    scene: String(input.scene ?? "").trim(),
+    isCore:
+      isCoreValue === undefined ||
+      isCoreValue === "" ||
+      isCoreValue === true ||
+      String(isCoreValue).toLowerCase() === "true" ||
+      String(isCoreValue) === "1",
+    crawlMethod,
+    url,
+    mode: String(input.mode ?? "").trim() || crawlMethod.toLowerCase(),
+    frequency: String(input.frequency ?? "daily").trim(),
+  };
 }
 
 function mergeManagedSources(baseSources: SourceRule[], storedSources: SourceRuleInput[]) {
@@ -569,468 +263,280 @@ function mergeManagedSources(baseSources: SourceRule[], storedSources: SourceRul
   return Array.from(byId.values());
 }
 
-function createEmptySourceRule(): SourceRule {
-  return {
-    id: "",
-    name: "",
-    category: "竞品情报",
-    secondaryCategory: "",
-    granularity: "关键词级",
-    market: "US",
-    competitor: "",
-    scene: "",
-    isCore: true,
-    crawlMethod: "RSS",
-    url: "",
-    mode: "rss",
-    frequency: "daily",
-  };
+function buildSourceStats(sources: SourceRule[]): SourceStat[] {
+  return sourceCategories.map((category) => {
+    const matched = sources.filter((source) => sourceCategoryLabel(source.category) === category);
+    return {
+      name: category,
+      total: matched.length,
+      active: matched.filter((source) => source.frequency !== "manual" && source.frequency !== "paused").length,
+      freq:
+        category === "竞品情报"
+          ? "每日"
+          : category === "用户声音"
+            ? "每日"
+            : category === "政策监管"
+              ? "官方优先"
+              : category === "需求触发市场"
+                ? "按对象加频"
+                : "每周",
+      color: categoryColors[category],
+    };
+  });
 }
 
-function createSourceId(name: string) {
-  const slug = name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40);
-  return slug || `source-${Date.now()}`;
-}
-
-function normalizeSourceRule(input: SourceRuleInput): SourceRule {
-  const name = String(input.name ?? "").trim();
-  const isCoreValue = input.isCore;
-  return {
-    ...createEmptySourceRule(),
-    ...input,
-    id: String(input.id ?? "").trim() || createSourceId(name),
-    name,
-    category: sourceCategoryLabel(String(input.category ?? "竞品情报").trim()),
-    secondaryCategory: String(input.secondaryCategory ?? "").trim(),
-    granularity: String(input.granularity ?? "关键词级").trim(),
-    market: String(input.market ?? "").trim(),
-    competitor: String(input.competitor ?? "").trim(),
-    scene: String(input.scene ?? "").trim(),
-    isCore:
-      isCoreValue === undefined ||
-      isCoreValue === "" ||
-      isCoreValue === true ||
-      String(isCoreValue).toLowerCase() === "true" ||
-      String(isCoreValue) === "1",
-    crawlMethod: String(input.crawlMethod ?? "RSS").trim(),
-    url: String(input.url ?? "").trim(),
-    mode: String(input.mode ?? "").trim() || String(input.crawlMethod ?? "RSS").trim().toLowerCase(),
-    frequency: String(input.frequency ?? "daily").trim(),
-  };
-}
-
-function parseDelimitedRows(text: string) {
-  const delimiter = text.includes("\t") ? "\t" : ",";
-  return text
-    .trim()
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((line) => splitDelimitedLine(line, delimiter));
-}
-
-function splitDelimitedLine(line: string, delimiter: string) {
-  const cells: string[] = [];
-  let current = "";
-  let quoted = false;
-  for (let index = 0; index < line.length; index += 1) {
-    const char = line[index];
-    const next = line[index + 1];
-    if (char === "\"" && quoted && next === "\"") {
-      current += "\"";
-      index += 1;
-    } else if (char === "\"") {
-      quoted = !quoted;
-    } else if (char === delimiter && !quoted) {
-      cells.push(current.trim());
-      current = "";
-    } else {
-      current += char;
-    }
+function shouldCrawlToday(source: SourceRule) {
+  if (source.frequency === "paused" || source.frequency === "manual") return false;
+  if (source.frequency === "weekly") {
+    return new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Shanghai", weekday: "short" }).format(new Date()) === "Mon";
   }
-  cells.push(current.trim());
-  return cells;
+  return true;
 }
 
-function parseSourceBatch(text: string) {
-  const trimmed = text.trim();
-  if (!trimmed) return [];
+function inferSourcePanel(source: SourceRule): PanelView {
+  const category = sourceCategoryLabel(source.category);
+  const text = `${source.name} ${source.secondaryCategory} ${source.scene} ${source.url}`.toLowerCase();
+  if (category === "政策监管") return "政策风险";
+  if (category === "用户声音") return "用户声音";
+  if (category === "需求触发市场" || /steamdb|game|gaming|f1|world cup|netflix|bbc|hulu|disney|espn|stream/.test(text)) return "增长热点";
+  if (category === "竞品情报" || category === "第三方媒体") return "竞品情报";
+  return "历史信息库";
+}
 
+function isCompetitorEvidence(item: Evidence) {
+  const text = `${item.title} ${item.summary} ${item.originalTitle ?? ""}`.toLowerCase();
+  return item.sourceType === "竞品情报" || (item.sourceType === "第三方媒体" && competitorNames.some((name) => text.includes(name.toLowerCase())));
+}
+
+function isUserVoiceEvidence(item: Evidence) {
+  const text = `${item.source} ${item.title} ${item.summary}`.toLowerCase();
+  return item.sourceType === "用户声音" || /reddit|forum|community|quora|discord|用户/.test(text);
+}
+
+function isPolicyEvidence(item: Evidence) {
+  return item.sourceType === "政策监管";
+}
+
+function isGrowthEvidence(item: Evidence) {
+  const text = `${item.title} ${item.summary} ${item.originalTitle ?? ""} ${item.platformObject ?? ""}`.toLowerCase();
+  return item.sourceType === "需求触发市场" || /netflix|bbc|iplayer|hulu|disney|espn|world cup|f1|steam|game|stream|sports/.test(text);
+}
+
+function sortByTime<T extends { time?: string; updatedAt?: string }>(items: T[]) {
+  return [...items].sort((a, b) => String(b.time ?? b.updatedAt ?? "").localeCompare(String(a.time ?? a.updatedAt ?? "")));
+}
+
+function uniquePolicyItems(items: Evidence[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = item.title
+      .replace(/[^\u4e00-\u9fffA-Za-z0-9]+/g, " ")
+      .toLowerCase()
+      .split(" ")
+      .slice(0, 10)
+      .join(" ");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function sourceDomain(url?: string) {
+  if (!url) return "";
   try {
-    const parsed = JSON.parse(trimmed);
-    const rows: SourceRuleInput[] = Array.isArray(parsed) ? parsed : Array.isArray(parsed.sources) ? parsed.sources : [];
-    return rows.map((row) => normalizeSourceRule(row));
+    return new URL(url).hostname.replace(/^www\./, "");
   } catch {
-    const rows = parseDelimitedRows(trimmed);
-    const headers = rows[0]?.map((header) => header.trim()) ?? [];
-    return rows.slice(1).map((row) => {
-      const record: Record<string, string> = {};
-      headers.forEach((header, index) => {
-        record[header] = row[index] ?? "";
-      });
-      return normalizeSourceRule(record);
-    });
+    return "";
   }
 }
 
-function sourcesToCsv(sources: SourceRule[]) {
-  const headers: (keyof SourceRule)[] = [
-    "id",
-    "name",
-    "category",
-    "secondaryCategory",
-    "granularity",
-    "market",
-    "competitor",
-    "scene",
-    "isCore",
-    "crawlMethod",
-    "url",
-    "mode",
-    "frequency",
-  ];
-  const escapeCell = (value: unknown) => `"${String(value ?? "").replace(/"/g, "\"\"")}"`;
-  return [headers.join(","), ...sources.map((source) => headers.map((header) => escapeCell(source[header])).join(","))].join("\n");
-}
-
-function sourceTypeFromBriefing(item: BriefingItem) {
-  if (item.type === "竞品动作") return "竞品情报";
-  if (item.type === "需求信号") return "用户声音";
-  if (item.type === "外部变化") return "政策监管";
-  return "主题关联";
-}
-
-function compactSourceTags(item: SourceTagInput) {
-  const sourceType = sourceCategoryLabel(item.sourceType ?? "其他");
-  const tags = [
-    sourceType,
-    inferSourceFormat(item),
-    inferSourceEntity(item),
-    inferUserMarketTag(item),
-    inferTargetTag(item),
-  ].filter(Boolean) as string[];
-
-  return Array.from(new Set(tags)).slice(0, 5);
-}
-
-function inferSourceFormat(item: SourceTagInput) {
-  const text = `${item.sourceType ?? ""} ${item.source} ${item.title} ${item.summary} ${item.originalTitle ?? ""} ${item.url ?? ""}`.toLowerCase();
-  const originalTitle = (item.originalTitle ?? "").toLowerCase();
-  const officialPublisher = competitorNames.some((name) => originalTitle.endsWith(`- ${name.toLowerCase()}`));
-  if (/reddit|forum|community|quora|ugc/.test(text)) return "论坛/社区";
-  if (/youtube|tiktok|instagram|twitter|x\.com|官方账号/.test(text)) return "官方账号";
-  if (/pricing|价格页/.test(text)) return "官网/价格页";
-  if (/google news|news\.google/.test(text) && !officialPublisher) return "新闻聚合";
-  if (officialPublisher) return "官网";
-  if (
-    sourceLinkQuality(item.url) === "原始链接" &&
-    (item.sourceType === "竞品情报" || sourceCategoryLabel(item.sourceType ?? "") === "竞品情报") &&
-    /^(nordvpn|expressvpn|surfshark|proton vpn|cyberghost|pia vpn)/.test(item.source.toLowerCase())
-  ) {
-    return "官网";
-  }
-  if (/google news|news\.google/.test(text)) return "新闻聚合";
-  if (/serp|seo|google search|search\?q=/.test(text)) return "搜索结果";
-  if (item.sourceType === "第三方媒体") return "媒体评测";
-  if (item.sourceType === "政策监管") return "政策/媒体";
-  return "网页";
-}
-
-function inferSourceEntity(item: SourceTagInput) {
-  const text = `${item.source} ${item.title} ${item.summary} ${item.originalTitle ?? ""}`.toLowerCase();
-  const matchedCompetitor = competitorNames.find((name) => text.includes(name.toLowerCase()));
-  if (matchedCompetitor) return matchedCompetitor;
-  if (text.includes("reddit")) return "Reddit";
-  if (text.includes("google serp")) return "Google SERP";
-  if (text.includes("google news")) return "Google News";
-  if (text.includes("bbc iplayer")) return "BBC iPlayer";
-  if (text.includes("netflix")) return "Netflix";
-  if (text.includes("world cup")) return "World Cup";
-  return item.source.length > 18 ? item.source.slice(0, 18) : item.source;
-}
-
-function inferUserMarketTag(item: SourceTagInput) {
-  if (item.userMarket) return `用户:${item.userMarket}`;
-  const text = `${item.title} ${item.summary} ${item.source} ${item.originalTitle ?? ""}`.toLowerCase();
-  if (/美国用户|user in the us|from the us|in the united states/.test(text)) return "用户:美国";
-  if (/英国用户|user in the uk|from the uk/.test(text)) return "用户:英国";
-  if (/德国用户|user in germany|from germany/.test(text)) return "用户:德国";
-  return "";
-}
-
-function inferTargetTag(item: SourceTagInput) {
-  if (item.platformObject) return `目标:${item.platformObject}`;
-  if (item.targetMarket) return `目标:${item.targetMarket}`;
-  const text = `${item.title} ${item.summary} ${item.source} ${item.originalTitle ?? ""}`.toLowerCase();
-  if (/bbc iplayer|iplayer/.test(text)) return "目标:BBC iPlayer";
-  if (/us streaming|美国流媒体|hulu|disney\+/.test(text)) return "目标:美国流媒体";
-  if (/world cup/.test(text)) return "目标:World Cup";
-  if (/public wi-fi|公共 wi-fi|公共网络/.test(text)) return "目标:公共 Wi-Fi";
-  return "";
-}
-
-function sourceLinkQuality(url?: string): LinkQuality {
-  if (!url) return "待解析";
-  const normalized = url.toLowerCase();
-  if (normalized.includes("news.google.com")) return "新闻聚合";
-  if (normalized.includes("google.com/search") || normalized.includes("youtube.com/results") || normalized.includes("reddit.com/search")) return "搜索页";
+function sourceQuality(item: Evidence) {
+  const domain = sourceDomain(item.url);
+  if (/\.gov|europa\.eu|ofcom|ftc|ico\.org|cnil|edpb/.test(domain)) return "官方";
+  if (/reddit|forum|community|quora|discord/.test(`${domain} ${item.source}`.toLowerCase())) return "用户讨论";
+  if (/news\.google|google\.com\/search/.test(item.url ?? "")) return "聚合链接";
   return "原始链接";
 }
 
-function isCanonicalOfficialUrl(url?: string) {
-  if (!url || sourceLinkQuality(url) !== "原始链接") return false;
-  const normalized = url.toLowerCase();
-  return (
-    normalized.includes("nordvpn.com") ||
-    normalized.includes("expressvpn.com") ||
-    normalized.includes("surfshark.com") ||
-    normalized.includes("youtube.com/@expressvpn") ||
-    normalized.includes("youtube.com/@nordvpn") ||
-    normalized.includes("youtube.com/@surfshark")
-  );
+function extractNeedText(item: Evidence) {
+  if (item.rawNeed) return item.rawNeed;
+  const text = item.summary.replace(/^该信息来自.+?，/, "");
+  return text.length > 90 ? `${text.slice(0, 90)}...` : text;
 }
 
-function isOfficialCompetitorEvidence(item: Evidence) {
-  if (sourceCategoryLabel(item.sourceType) !== "竞品情报") return false;
-  return isCanonicalOfficialUrl(item.url);
-}
+function createGrowthHotspots(evidence: Evidence[], themes: Theme[], sources: SourceRule[]) {
+  const movieSignals = [
+    ...themes.filter((theme) => /bbc|iplayer|netflix|hulu|disney|流媒体|影视/i.test(`${theme.title} ${theme.platform}`)),
+    ...evidence.filter((item) => /netflix|bbc|iplayer|hulu|disney|stream|影视|流媒体/i.test(`${item.title} ${item.summary}`)).slice(0, 3).map(themeFromEvidence),
+  ].slice(0, 5);
+  const sportsSignals = [
+    ...themes.filter((theme) => /world cup|f1|espn|体育|赛事/i.test(`${theme.title} ${theme.platform}`)),
+    ...evidence.filter((item) => /world cup|f1|espn|match|sports|体育|赛事/i.test(`${item.title} ${item.summary}`)).slice(0, 4).map(themeFromEvidence),
+  ].slice(0, 5);
+  const gameSources = sources.filter((source) => /steamdb|steam|game|gaming|电竞|游戏/i.test(`${source.name} ${source.secondaryCategory} ${source.url}`)).slice(0, 6);
+  const gameSignals = gameSources.map((source, index) => ({
+    id: source.id,
+    title: index === 0 && /steamdb/i.test(source.name) ? "SteamDB 全球热度排行" : source.name,
+    summary: `跟踪 ${source.name} 的热度、平台限制和玩家讨论，结合论坛信号判断是否存在加速、跨区访问或平台限制需求。`,
+    market: source.market || "Global",
+    platform: source.name,
+    priority: source.isCore ? "高" : "中",
+    trend: source.frequency === "daily" ? "升温" : "稳定",
+    currentEvidence: 0,
+    coreEvidence: 0,
+  })) as Theme[];
 
-function isUserForumEvidence(item: Evidence) {
-  if (sourceCategoryLabel(item.sourceType) !== "用户声音") return false;
-  const text = `${item.source} ${item.title} ${item.summary} ${item.originalTitle ?? ""} ${item.url ?? ""}`.toLowerCase();
-  return /reddit|forum|community|quora|ugc|用户论坛/.test(text);
-}
-
-function inferDisplayPriority(item: Pick<Evidence, "role" | "sourceType" | "title" | "summary">): DisplayPriority {
-  const text = `${item.title} ${item.summary}`.toLowerCase();
-  if (item.sourceType === "政策监管" && (text.includes("age") || text.includes("verification") || text.includes("ban"))) return "P0";
-  if (item.role === "核心证据" || item.sourceType === "竞品情报") return "P1";
-  if (item.sourceType === "第三方媒体") return "P2";
-  return "P2";
-}
-
-function inferBriefingDisplayPriority(item: BriefingItem): DisplayPriority {
-  const text = `${item.title} ${item.summary}`.toLowerCase();
-  if (item.type === "外部变化" && (text.includes("年龄") || text.includes("age") || text.includes("verification"))) return "P0";
-  if (item.priority === "高") return "P1";
-  if (item.priority === "中") return "P2";
-  return "P3";
-}
-
-function inferSourceWeight(sourceType: string, source: string): SourceWeight {
-  const text = `${sourceType} ${source}`.toLowerCase();
-  if (sourceType === "政策监管" || text.includes("official") || text.includes("nordvpn") || text.includes("surfshark") || text.includes("expressvpn")) return "高";
-  if (sourceType === "SEO搜索" || sourceType === "用户声音") return "中";
-  if (sourceType === "第三方媒体") return "中低";
-  return "低";
-}
-
-function inferThemeMaturity(theme: Theme): MaturityLevel {
-  if (theme.currentEvidence >= 8 && theme.linkedThemes >= 1 && theme.priority === "高") return "L2";
-  if (theme.currentEvidence >= 3 || theme.linkedThemes >= 1) return "L1";
-  return "L0";
-}
-
-function inferOpportunityMaturity(opportunity: Opportunity): MaturityLevel {
-  if (opportunity.status === "已完成") return "L4";
-  if (opportunity.status === "验证中" || opportunity.status === "执行中" || opportunity.status === "已立项") return "L3";
-  return "L2";
-}
-
-function scoreTheme(theme: Theme) {
-  const demand = theme.type === "需求型" ? 2 : theme.platform !== "价格页" ? 1 : 0;
-  const restriction = /限制|受限|地区|支付|隐私|公共网络|解锁|访问/.test(theme.summary + theme.title) ? 2 : theme.type === "需求型" ? 1 : 0;
-  const vpnFit = /VPN|节点|访问|解锁|隐私|跨区/.test(theme.summary + theme.title) ? 2 : 1;
-  const frequency = theme.currentEvidence >= 6 ? 2 : theme.currentEvidence >= 3 ? 1 : 0;
-  const sourceMix = theme.linkedThemes >= 2 ? 2 : theme.linkedThemes >= 1 ? 1 : 0;
-  const total = demand + restriction + vpnFit + frequency + sourceMix;
-  const suggested: MaturityLevel = total >= 8 && restriction > 0 && vpnFit > 0 ? "L2" : total >= 4 ? "L1" : "L0";
-
-  return { demand, restriction, vpnFit, frequency, sourceMix, total, suggested };
-}
-
-
-function Badge({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return (
-    <span className={`inline-flex h-7 items-center rounded-full border px-3 text-xs font-semibold ${className}`}>
-      {children}
-    </span>
-  );
-}
-
-function SourceTagRow({ tags }: { tags: string[] }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {tags.map((tag) => (
-        <span key={tag} className="inline-flex h-7 items-center rounded-full border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-600">
-          {tag}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function MiniBars({ current, previous }: { current: number; previous: number }) {
-  const max = Math.max(current, previous, 1);
-  return (
-    <div className="flex h-12 w-20 items-end gap-2" aria-label={`本周期 ${current} 条, 上周期 ${previous} 条`}>
-      <div className="w-8 rounded-t bg-zinc-300" style={{ height: `${Math.max(20, (previous / max) * 48)}px` }} />
-      <div className="w-8 rounded-t bg-teal-500" style={{ height: `${Math.max(20, (current / max) * 48)}px` }} />
-    </div>
-  );
-}
-
-function createDefaultReview(theme: Theme): ManualReview {
   return {
-    themeId: theme.id,
-    priority: theme.priority,
-    rating: theme.priority,
-    demandStrength: theme.type === "需求型" ? theme.priority : "中",
-    competitorResponse: theme.type === "动作型" ? theme.priority : "中",
-    actionability: theme.priority === "高" ? "高" : "中",
-    risk: theme.trend === "样本不足" ? "高" : "中",
-    relationDecision: "待确认",
-    opportunityDecision: theme.priority === "高" ? "进入机会池" : "继续观察",
-    actions: theme.type === "需求型" ? ["产品能力验证", "SEO页面"] : ["内容选题"],
-    note: "",
+    "影视": movieSignals,
+    "体育": sportsSignals,
+    "游戏": gameSignals,
   };
 }
 
-function SegmentedButtons<T extends string>({
-  value,
-  options,
-  onChange,
-}: {
-  value: T;
-  options: T[];
-  onChange: (value: T) => void;
-}) {
+function themeFromEvidence(item: Evidence): Theme {
+  return {
+    id: item.id,
+    type: "需求型",
+    title: item.title,
+    summary: item.summary,
+    market: item.userMarket ?? "Global",
+    platform: item.platformObject ?? item.source,
+    competitor: "多信源",
+    trend: "新出现",
+    priority: item.role === "核心证据" ? "高" : "中",
+    currentEvidence: item.role === "核心证据" ? 1 : 0,
+    previousEvidence: 0,
+    coreEvidence: item.role === "核心证据" ? 1 : 0,
+    referenceInfo: item.role === "参考信息" ? 1 : 0,
+    linkedThemes: 0,
+    updatedAt: item.time,
+  };
+}
+
+function buildOpportunityFromTheme(theme: Theme): Opportunity {
+  return {
+    id: `theme-${theme.id}`,
+    themeId: theme.id,
+    title: theme.title,
+    type: theme.priority === "高" ? "短期机会" : "观察机会",
+    feasibility: theme.coreEvidence >= 3 ? "可验证" : "待验证",
+    status: theme.coreEvidence >= 3 ? "验证中" : "继续观察",
+    actions: theme.type === "需求型" ? ["内容选题", "SEO页面", "产品能力验证"] : ["竞品跟进", "落地页优化"],
+    cycle: "先观察 7 天信号变化，再决定是否进入执行排期",
+    nextStep: "补齐来源链接、确认用户限制原因和 VPN 相关性",
+    owner: "增长运营",
+  };
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function Badge({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <span className={`inline-flex min-h-7 items-center rounded-full border px-3 text-xs font-semibold ${className}`}>{children}</span>;
+}
+
+function SectionHeader({ eyebrow, title, summary, right }: { eyebrow?: string; title: string; summary?: string; right?: ReactNode }) {
   return (
-    <div className="grid grid-cols-3 rounded-md border border-zinc-200 bg-zinc-50 p-1">
-      {options.map((option) => (
-        <button
-          key={option}
-          onClick={() => onChange(option)}
-          className={`h-9 rounded px-2 text-sm font-semibold ${
-            value === option ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-500 hover:text-zinc-950"
-          }`}
-        >
-          {option}
-        </button>
-      ))}
+    <div className="flex flex-col gap-3 border-b border-zinc-200 pb-4 md:flex-row md:items-start md:justify-between">
+      <div>
+        {eyebrow && <p className="text-xs font-semibold uppercase tracking-[0.08em] text-teal-700">{eyebrow}</p>}
+        <h2 className="mt-1 text-2xl font-semibold tracking-normal text-zinc-950">{title}</h2>
+        {summary && <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-600">{summary}</p>}
+      </div>
+      {right}
     </div>
   );
 }
 
-function SourceDisclosure({
-  url,
-  originalTitle,
-  className = "",
-}: {
-  url?: string;
-  originalTitle?: string;
-  className?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const quality = sourceLinkQuality(url);
-
-  if (!url) return null;
-
+function Metric({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
   return (
-    <div className={`min-w-0 ${className}`}>
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-        className="inline-flex text-sm font-semibold text-teal-700 hover:text-teal-900"
-      >
-        {open ? "收起来源" : "查看来源"}
-      </button>
-      {open && (
-        <div className="mt-2 max-w-full rounded-md border border-zinc-200 bg-white p-3 text-xs leading-5 text-zinc-600">
-          <div className="mb-2 flex flex-wrap gap-2">
-            <Badge className={linkQualityStyles[quality]}>{quality}</Badge>
-            {quality !== "原始链接" && <Badge className="border-amber-200 bg-amber-50 text-amber-800">需原文核验</Badge>}
-          </div>
-          {originalTitle && (
-            <p className="mb-2 break-words">
-              <span className="font-semibold text-zinc-700">原始标题：</span>
-              {originalTitle}
-            </p>
-          )}
-          <p className="font-semibold text-zinc-700">原链接：</p>
-          <p className="mt-1 break-all font-mono text-[11px] leading-5 text-zinc-600">{url}</p>
-          {quality !== "原始链接" && (
-            <p className="mt-2 text-zinc-500">当前链接不是最终原文，适合作为发现入口，不应直接作为已核验事实。</p>
-          )}
-        </div>
-      )}
+    <div className="rounded-md border border-zinc-200 bg-white p-4">
+      <p className="text-xs font-semibold text-zinc-500">{label}</p>
+      <p className="mt-1 break-words text-2xl font-semibold text-zinc-950">{value}</p>
+      {hint && <p className="mt-1 text-xs text-zinc-500">{hint}</p>}
     </div>
+  );
+}
+
+function SourceDisclosure({ item }: { item: Evidence | BriefingItem }) {
+  if (!item.url) return null;
+  return (
+    <details className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+      <summary className="cursor-pointer text-sm font-semibold text-teal-700">来源链接</summary>
+      <a className="mt-2 block break-all text-xs leading-5 text-zinc-600 hover:text-zinc-950" href={item.url} target="_blank" rel="noreferrer">
+        {item.url}
+      </a>
+    </details>
+  );
+}
+
+function EvidenceCard({ item, compact = false }: { item: Evidence; compact?: boolean }) {
+  return (
+    <article className="rounded-md border border-zinc-200 bg-white p-4">
+      <div className="flex flex-wrap gap-2">
+        <Badge className={item.role === "核心证据" ? "border-teal-200 bg-teal-50 text-teal-700" : "border-zinc-200 bg-zinc-50 text-zinc-600"}>
+          {item.role}
+        </Badge>
+        <Badge className="border-zinc-200 bg-white text-zinc-600">{sourceQuality(item)}</Badge>
+        {item.vpnRelevance && <Badge className="border-cyan-200 bg-cyan-50 text-cyan-700">{item.vpnRelevance}</Badge>}
+      </div>
+      <h3 className={`${compact ? "text-base" : "text-lg"} mt-3 break-words font-semibold text-zinc-950`}>{item.title}</h3>
+      <p className="mt-2 break-words text-sm leading-6 text-zinc-600">{compact ? extractNeedText(item) : item.summary}</p>
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
+        <span>{item.source}</span>
+        <span>{item.time}</span>
+      </div>
+      <SourceDisclosure item={item} />
+    </article>
   );
 }
 
 export default function Home() {
-  const [briefingPeriod, setBriefingPeriod] = useState<"daily" | "weekly">("daily");
-  const [activeView, setActiveView] = useState("简报");
-  const [themeFilter, setThemeFilter] = useState<"全部" | ThemeType>("全部");
-  const [selectedThemeId, setSelectedThemeId] = useState("d1");
-  const [manualReviewsReady, setManualReviewsReady] = useState(false);
-  const [manualReviews, setManualReviews] = useState<ManualReviewState>({});
+  const [activeView, setActiveView] = useState<PanelView>("竞品情报");
+  const [hotspotView, setHotspotView] = useState<HotspotView>("影视");
   const [historyQuery, setHistoryQuery] = useState("");
   const [historyCategory, setHistoryCategory] = useState("全部");
-  const [historyPriority, setHistoryPriority] = useState<"全部" | DisplayPriority>("全部");
-  const [feedbackType, setFeedbackType] = useState("误判");
-  const [feedbackNote, setFeedbackNote] = useState("");
-  const [feedbackLogs, setFeedbackLogs] = useState<string[]>([]);
-  const [sourceCatalogReady, setSourceCatalogReady] = useState(false);
-  const [managedSources, setManagedSources] = useState<SourceRule[]>(sourceRules.sources);
   const [sourceQuery, setSourceQuery] = useState("");
-  const [sourceCategoryFilter, setSourceCategoryFilter] = useState("全部");
   const [sourceForm, setSourceForm] = useState<SourceRule>(createEmptySourceRule());
-  const [batchInput, setBatchInput] = useState("");
-  const [sourceImportMessage, setSourceImportMessage] = useState("");
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      setManualReviewsReady(true);
-      return;
-    }
-    try {
-      setManualReviews(JSON.parse(window.localStorage.getItem("vpn-intel-manual-reviews") ?? "{}") as ManualReviewState);
-      setFeedbackLogs(JSON.parse(window.localStorage.getItem("vpn-intel-feedback-logs") ?? "[]") as string[]);
-    } catch {
-      setManualReviews({});
-      setFeedbackLogs([]);
-    }
-    setManualReviewsReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (!manualReviewsReady) return;
-    window.localStorage.setItem("vpn-intel-manual-reviews", JSON.stringify(manualReviews));
-  }, [manualReviews, manualReviewsReady]);
-
-  useEffect(() => {
-    if (!manualReviewsReady) return;
-    window.localStorage.setItem("vpn-intel-feedback-logs", JSON.stringify(feedbackLogs));
-  }, [feedbackLogs, manualReviewsReady]);
+  const [sourceNotice, setSourceNotice] = useState("");
+  const [managedSources, setManagedSources] = useState<SourceRule[]>(sourceRules.sources);
+  const [sourceCatalogReady, setSourceCatalogReady] = useState(false);
+  const [opportunityEdits, setOpportunityEdits] = useState<Record<string, OpportunityEdit>>({});
+  const [opportunityReady, setOpportunityReady] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") {
       setSourceCatalogReady(true);
+      setOpportunityReady(true);
       return;
     }
+
     try {
       const stored = window.localStorage.getItem("vpn-intel-managed-sources");
       if (stored) setManagedSources(mergeManagedSources(sourceRules.sources, JSON.parse(stored) as SourceRuleInput[]));
     } catch {
       setManagedSources(sourceRules.sources);
     }
+
+    try {
+      const stored = window.localStorage.getItem("vpn-intel-opportunity-edits");
+      if (stored) setOpportunityEdits(JSON.parse(stored) as Record<string, OpportunityEdit>);
+    } catch {
+      setOpportunityEdits({});
+    }
+
     setSourceCatalogReady(true);
+    setOpportunityReady(true);
   }, []);
 
   useEffect(() => {
@@ -1038,306 +544,121 @@ export default function Home() {
     window.localStorage.setItem("vpn-intel-managed-sources", JSON.stringify(managedSources));
   }, [managedSources, sourceCatalogReady]);
 
-  const visibleBriefing = useMemo(
-    () => intelligence.briefingItems.filter((item) => item.period === briefingPeriod && item.priority === "高"),
-    [briefingPeriod],
-  );
+  useEffect(() => {
+    if (!opportunityReady || typeof window === "undefined") return;
+    window.localStorage.setItem("vpn-intel-opportunity-edits", JSON.stringify(opportunityEdits));
+  }, [opportunityEdits, opportunityReady]);
 
-  const visibleThemes = useMemo(
-    () => intelligence.themes.filter((theme) => themeFilter === "全部" || theme.type === themeFilter),
-    [themeFilter],
-  );
-
-  const selectedTheme = intelligence.themes.find((theme) => theme.id === selectedThemeId) ?? intelligence.themes[0];
-  const selectedEvidence = intelligence.evidence.filter((item) => item.themeId === selectedTheme.id);
-  const selectedRelations = intelligence.themeRelations.filter(
-    (relation) => relation.leftThemeId === selectedTheme.id || relation.rightThemeId === selectedTheme.id,
-  );
-  const selectedOpportunities = intelligence.opportunities.filter((opportunity) => opportunity.themeId === selectedTheme.id);
-  const sourceUrlByTitle = useMemo(
-    () =>
-      new Map(
-        intelligence.evidence.flatMap((item): [string, string][] => {
-          if (!item.url) return [];
-          return item.originalTitle
-            ? [
-                [item.title, item.url],
-                [item.originalTitle, item.url],
-              ]
-            : [[item.title, item.url]];
-        }),
-      ),
-    [],
-  );
-  const evidenceWithMeta = useMemo(
-    () =>
-      intelligence.evidence.map((item) => ({
-        ...item,
-        sourceCategory: sourceCategoryLabel(item.sourceType),
-        sourceTags: compactSourceTags(item),
-        linkQuality: sourceLinkQuality(item.url),
-        reviewStatus: item.reviewStatus ?? (sourceLinkQuality(item.url) === "原始链接" ? "系统建议" : "待确认"),
-        maturity: "L0" as MaturityLevel,
-        displayPriority: inferDisplayPriority(item),
-        sourceWeight: inferSourceWeight(item.sourceType, item.source),
-      })),
-    [],
-  );
-  const officialCompetitorItems = evidenceWithMeta.filter((item) => isOfficialCompetitorEvidence(item)).slice(0, 5);
-  const userForumItems = evidenceWithMeta.filter((item) => isUserForumEvidence(item)).slice(0, 5);
-  const todayActionItems = [
-    {
-      title: "核验竞品官方原文",
-      source: "竞品官方信源",
-      reason: officialCompetitorItems.length > 0 ? `已保留 ${officialCompetitorItems.length} 条官方域名/账号信息` : "今日官方信源不足，需要补抓原始页面",
-      owner: "增长PM",
-      due: "今天",
-      status: "待确认" as ReviewStatus,
-    },
-    {
-      title: "补齐用户论坛原帖",
-      source: "用户论坛声音",
-      reason: `${userForumItems.filter((item) => item.linkQuality !== "原始链接").length} 条仍是搜索页，需要定位原帖链接和讨论热度`,
-      owner: "运营",
-      due: "今天",
-      status: "待确认" as ReviewStatus,
-    },
-    {
-      title: "确认高优先级机会",
-      source: "机会池",
-      reason: "BBC iPlayer 访问、跨区订阅和家庭套餐已形成可跟进入口",
-      owner: "增长运营",
-      due: "本周",
-      status: "系统建议" as ReviewStatus,
-    },
+  const sourceStats = useMemo(() => buildSourceStats(managedSources), [managedSources]);
+  const todayScheduledSources = managedSources.filter(shouldCrawlToday).length;
+  const activeSourceCount = managedSources.filter((source) => source.frequency !== "manual" && source.frequency !== "paused").length;
+  const competitorItems = sortByTime(intelligence.evidence.filter(isCompetitorEvidence)).slice(0, 10);
+  const userVoiceItems = sortByTime(intelligence.evidence.filter(isUserVoiceEvidence)).slice(0, 10);
+  const growthItems = sortByTime(intelligence.evidence.filter(isGrowthEvidence)).slice(0, 10);
+  const policyItems = uniquePolicyItems(sortByTime(intelligence.evidence.filter(isPolicyEvidence))).slice(0, 8);
+  const hotspots = createGrowthHotspots(growthItems, intelligence.themes, managedSources);
+  const l2Themes = intelligence.themes.filter((theme) => theme.coreEvidence >= 3 || theme.priority === "高");
+  const opportunityItems = [
+    ...intelligence.opportunities,
+    ...l2Themes
+      .filter((theme) => !intelligence.opportunities.some((opportunity) => opportunity.themeId === theme.id))
+      .map(buildOpportunityFromTheme),
   ];
-  const priorityEvents = evidenceWithMeta
-    .filter((item) => item.displayPriority === "P0" || item.displayPriority === "P1")
-    .slice(0, 6);
-  const candidateInsights = intelligence.themes
-    .map((theme) => ({ ...theme, maturity: inferThemeMaturity(theme), score: scoreTheme(theme) }))
-    .filter((theme) => theme.maturity === "L1" || theme.maturity === "L2")
-    .sort((a, b) => b.score.total - a.score.total);
-  const demandObjects = [
-    {
-      name: "BBC iPlayer",
-      category: "流媒体 / 影视",
-      heat: "高",
-      restriction: "地区版权限制",
-      markets: "US → UK",
-      platform: "BBC iPlayer",
-      maturity: "L2" as MaturityLevel,
-      status: "验证中",
-    },
-    {
-      name: "2026 World Cup",
-      category: "体育赛事",
-      heat: "高",
-      restriction: "转播地区差异",
-      markets: "Global",
-      platform: "BBC / ESPN / 本地电视台",
-      maturity: "L1" as MaturityLevel,
-      status: "限制待确认",
-    },
-    {
-      name: "Hulu / Disney+ 跨区订阅",
-      category: "流媒体 / 影视",
-      heat: "中",
-      restriction: "支付地区与账号地区",
-      markets: "DE → US",
-      platform: "Hulu / Disney+",
-      maturity: "L2" as MaturityLevel,
-      status: "待评估",
-    },
-  ];
-  const categorySummaries = sourceCategories.map((category) => {
-    const items = evidenceWithMeta.filter((item) => item.sourceCategory === category);
-    const important = items.filter((item) => item.displayPriority === "P0" || item.displayPriority === "P1").length;
-    return {
-      category,
-      total: items.length,
-      important,
-      summary:
-        category === "竞品情报"
-          ? "观察竞品官网、价格、功能、节点和官方内容动作。"
-          : category === "用户声音"
-            ? "聚合用户访问困难、替代品讨论和隐含 VPN 场景。"
-            : category === "SEO搜索"
-              ? "跟踪竞品词、场景词和访问困难词的搜索信号。"
-              : category === "政策监管"
-                ? "监控欧美政策、年龄验证、隐私与平台监管风险。"
-                : category === "需求触发市场"
-                  ? "按赛事、流媒体、游戏等对象观察高热限制场景。"
-                  : "保留评测、榜单、对比和行业媒体参考。",
-    };
-  });
-  const visibleHistory = evidenceWithMeta.filter((item) => {
+  const historyItems = sortByTime(intelligence.evidence).filter((item) => {
     const query = historyQuery.trim().toLowerCase();
     const text = `${item.title} ${item.summary} ${item.source} ${item.originalTitle ?? ""}`.toLowerCase();
     const matchesQuery = !query || text.includes(query);
-    const matchesCategory = historyCategory === "全部" || item.sourceCategory === historyCategory;
-    const matchesPriority = historyPriority === "全部" || item.displayPriority === historyPriority;
-    return matchesQuery && matchesCategory && matchesPriority;
-  });
-  const baseSourceIds = useMemo(() => new Set(sourceRules.sources.map((source) => source.id)), []);
-  const managedSourceCategories = useMemo(
-    () => Array.from(new Set(managedSources.map((source) => source.category).filter(Boolean))),
-    [managedSources],
-  );
-  const filteredManagedSources = managedSources.filter((source) => {
-    const query = sourceQuery.trim().toLowerCase();
-    const text =
-      `${source.name} ${source.url} ${source.category} ${source.secondaryCategory} ${source.market} ${source.competitor} ${source.scene} ${source.crawlMethod} ${sourceCrawlMethodLabel(source.crawlMethod)} ${source.frequency} ${sourceFrequencyLabel(source.frequency)}`.toLowerCase();
-    const matchesQuery = !query || text.includes(query);
-    const matchesCategory = sourceCategoryFilter === "全部" || source.category === sourceCategoryFilter;
+    const matchesCategory = historyCategory === "全部" || sourceCategoryLabel(item.sourceType) === historyCategory;
     return matchesQuery && matchesCategory;
   });
-  const customSourceCount = managedSources.filter((source) => !baseSourceIds.has(source.id)).length;
-  const coreManagedSourceCount = managedSources.filter((source) => source.isCore).length;
-  const selectedManualReview = {
-    ...createDefaultReview(selectedTheme),
-    ...(intelligence.manualReviews?.find((review) => review.themeId === selectedTheme.id) ?? {}),
-    ...(manualReviews[selectedTheme.id] ?? {}),
-  };
-  const coreEvidenceCount = intelligence.evidence.filter((item) => item.role === "核心证据").length;
-  const referenceEvidenceCount = intelligence.evidence.length - coreEvidenceCount;
-  const highThemeCount = intelligence.themes.filter((theme) => theme.priority === "高").length;
-  const manualReviewCount = new Set([
-    ...Object.keys(manualReviews),
-    ...(intelligence.manualReviews?.map((review) => review.themeId) ?? []),
-  ]).size;
-  const validatingOpportunityCount = intelligence.opportunities.filter((opportunity) => opportunity.status === "验证中").length;
-  const waitingOpportunityCount = intelligence.opportunities.filter((opportunity) => opportunity.status === "待评估").length;
-  const totalSourceCount = configuredSourceStats.reduce((sum, source) => sum + source.total, 0);
-  const activeSourceCount = configuredSourceStats.reduce((sum, source) => sum + source.active, 0);
-  const lastUpdatedTime = new Intl.DateTimeFormat("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(intelligence.generatedAt));
-
-  function updateManualReview(patch: Partial<ManualReview>) {
-    setManualReviews((current) => ({
-      ...current,
-      [selectedTheme.id]: {
-        ...createDefaultReview(selectedTheme),
-        ...(current[selectedTheme.id] ?? {}),
-        ...patch,
-      },
-    }));
-  }
-
-  function toggleManualAction(action: string) {
-    const currentActions = selectedManualReview.actions;
-    updateManualReview({
-      actions: currentActions.includes(action)
-        ? currentActions.filter((item) => item !== action)
-        : [...currentActions, action],
-    });
-  }
-
-  function submitFeedback() {
-    const note = feedbackNote.trim();
-    if (!note) return;
-    const timestamp = new Intl.DateTimeFormat("zh-CN", {
-      timeZone: "Asia/Shanghai",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(new Date());
-    setFeedbackLogs((current) => [`${timestamp} · ${feedbackType} · ${note}`, ...current].slice(0, 20));
-    setFeedbackNote("");
-  }
+  const filteredSources = managedSources.filter((source) => {
+    const query = sourceQuery.trim().toLowerCase();
+    const text = `${source.name} ${source.url} ${source.category} ${source.secondaryCategory} ${source.market} ${source.competitor} ${source.scene}`.toLowerCase();
+    return !query || text.includes(query);
+  });
+  const officialCompetitorSources = managedSources.filter((source) => {
+    const text = `${source.category} ${source.secondaryCategory} ${source.name}`.toLowerCase();
+    return sourceCategoryLabel(source.category) === "竞品情报" && /官方|官网|社交|博客|公告|服务器|价格/.test(text);
+  }).length;
+  const userForumSources = managedSources.filter((source) => {
+    const text = `${source.category} ${source.secondaryCategory} ${source.url}`.toLowerCase();
+    return sourceCategoryLabel(source.category) === "用户声音" || /reddit|forum|community|quora|discord/.test(text);
+  }).length;
+  const officialPolicySources = managedSources.filter((source) => {
+    const domain = sourceDomain(source.url);
+    return sourceCategoryLabel(source.category) === "政策监管" && (/\.gov|europa\.eu|ofcom|ftc|ico\.org|cnil|edpb/.test(domain) || /政府|监管|官方|标准/.test(source.secondaryCategory));
+  }).length;
 
   function updateSourceForm<K extends keyof SourceRule>(key: K, value: SourceRule[K]) {
     setSourceForm((current) => ({ ...current, [key]: value }));
   }
 
-  function upsertSources(nextSources: SourceRule[]) {
-    setManagedSources((current) => {
-      const byId = new Map(current.map((source) => [source.id, source]));
-      nextSources.forEach((source) => byId.set(source.id, normalizeSourceRule(source)));
-      return Array.from(byId.values());
-    });
-  }
-
-  function submitSourceForm() {
+  function saveSource() {
     const normalized = normalizeSourceRule(sourceForm);
     if (!normalized.name || !normalized.url) {
-      setSourceImportMessage("请至少填写信源名称和连接。");
+      setSourceNotice("请填写信源名称和链接。");
       return;
     }
-    upsertSources([normalized]);
+    setManagedSources((current) => {
+      const byId = new Map(current.map((source) => [source.id, source]));
+      byId.set(normalized.id, normalized);
+      return Array.from(byId.values());
+    });
     setSourceForm(createEmptySourceRule());
-    setSourceImportMessage(`已添加或更新信源：${normalized.name}`);
-  }
-
-  function importSourceBatch() {
-    try {
-      const parsed = parseSourceBatch(batchInput).filter((source) => source.name && source.url);
-      if (parsed.length === 0) {
-        setSourceImportMessage("没有识别到可导入的信源。");
-        return;
-      }
-      upsertSources(parsed);
-      setBatchInput("");
-      setSourceImportMessage(`已导入或更新 ${parsed.length} 条信源。`);
-    } catch {
-      setSourceImportMessage("导入失败，请检查 JSON、CSV 或 TSV 格式。");
-    }
-  }
-
-  function resetManagedSources() {
-    setManagedSources(sourceRules.sources);
-    setSourceImportMessage("已恢复为仓库内当前信源配置。");
+    setSourceNotice(`已添加或更新：${normalized.name}`);
   }
 
   function editSource(source: SourceRule) {
     setSourceForm(normalizeSourceRule(source));
-    setSourceImportMessage(`正在编辑信源：${source.name}`);
+    setSourceNotice(`正在编辑：${source.name}`);
   }
 
-  function removeSource(source: SourceRule) {
-    setManagedSources((current) => current.filter((item) => item.id !== source.id));
-    setSourceImportMessage(`已从维护列表移除信源：${source.name}`);
+  function resetSources() {
+    setManagedSources(sourceRules.sources);
+    setSourceNotice("已恢复为仓库内的正式信源。");
   }
 
-  function downloadSourceFile(format: "json" | "csv") {
+  function exportSources() {
     if (typeof window === "undefined") return;
-    const content =
-      format === "json"
-        ? JSON.stringify({ ...sourceRules, sources: managedSources }, null, 2)
-        : sourcesToCsv(managedSources);
-    const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv;charset=utf-8" });
+    const blob = new Blob([JSON.stringify({ ...sourceRules, sources: managedSources }, null, 2)], { type: "application/json" });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `vpn-source-rules.${format}`;
+    link.download = "vpn-source-rules.json";
     link.click();
     window.URL.revokeObjectURL(url);
   }
 
+  function updateOpportunity(id: string, patch: Partial<OpportunityEdit>, fallback: Opportunity) {
+    const defaultEdit: OpportunityEdit = {
+      rating: fallback.type === "短期机会" ? "高" : "中",
+      status: fallback.status,
+      note: fallback.nextStep,
+    };
+    setOpportunityEdits((current) => ({
+      ...current,
+      [id]: {
+        ...defaultEdit,
+        ...(current[id] ?? {}),
+        ...patch,
+      },
+    }));
+  }
+
   return (
-    <main className="min-h-screen bg-[#f6f7f4] text-zinc-950">
-      <header className="border-b border-zinc-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
+    <main className="min-h-screen bg-[#f5f6f3] text-zinc-950">
+      <header className="border-b border-zinc-200 bg-white">
+        <div className="mx-auto grid max-w-7xl gap-5 px-5 py-5 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
             <p className="text-sm font-semibold text-teal-700">VPN 市场增长信息中心</p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-normal text-zinc-950">
-              {intelligence.displayDate} 情报简报
-            </h1>
+            <h1 className="mt-1 text-3xl font-semibold tracking-normal">运营情报工作台</h1>
+            <p className="mt-2 text-sm text-zinc-500">更新：{intelligence.displayDate} · 北京时间 {formatDateTime(intelligence.generatedAt)}</p>
           </div>
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-            {configuredSourceStats.map((source) => (
-              <div key={source.name} className="min-w-24 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
-                <div className={`mb-2 h-1.5 rounded-full ${source.color}`} />
-                <p className="text-xs font-medium text-zinc-500">{source.name}</p>
-                <p className="text-lg font-semibold">{source.active}/{source.total}</p>
-              </div>
-            ))}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Metric label="今日新增" value={intelligence.status.newItemsToday} />
+            <Metric label="高优先级" value={intelligence.status.highPriorityToday} />
+            <Metric label="正式信源" value={managedSources.length} />
+            <Metric label="今日排期" value={todayScheduledSources} />
           </div>
         </div>
       </header>
@@ -1345,49 +666,38 @@ export default function Home() {
       <div className="mx-auto grid max-w-7xl gap-5 px-5 py-5 lg:grid-cols-[220px_1fr]">
         <aside className="lg:sticky lg:top-5 lg:h-fit">
           <nav className="grid gap-2 rounded-md border border-zinc-200 bg-white p-2">
-            {["简报", "主题库", "证据库", "机会池", "信源状态", "信源维护", "标签体系", "规则模型", "反馈配置"].map((view) => (
+            {panelViews.map((view) => (
               <button
                 key={view}
+                type="button"
                 onClick={() => setActiveView(view)}
                 className={`h-11 rounded px-3 text-left text-sm font-semibold transition ${
-                  activeView === view
-                    ? "bg-zinc-950 text-white"
-                    : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950"
+                  activeView === view ? "bg-zinc-950 text-white" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950"
                 }`}
               >
                 {view}
               </button>
             ))}
           </nav>
-
           <section className="mt-4 rounded-md border border-zinc-200 bg-white p-4">
-            <p className="text-sm font-semibold">抓取状态</p>
+            <p className="text-sm font-semibold">信源状态</p>
             <div className="mt-3 grid gap-3">
               <div>
-                <div className="flex items-center justify-between text-xs text-zinc-500">
-                  <span>今日正常信源</span>
+                <div className="flex justify-between text-xs text-zinc-500">
+                  <span>启用信源</span>
+                  <span>{activeSourceCount}</span>
+                </div>
+                <div className="mt-1 h-2 rounded-full bg-zinc-100">
+                  <div className="h-2 rounded-full bg-teal-500" style={{ width: `${Math.min(100, (activeSourceCount / Math.max(1, managedSources.length)) * 100)}%` }} />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs text-zinc-500">
+                  <span>抓取正常</span>
                   <span>{intelligence.status.normalSourceRate}%</span>
                 </div>
                 <div className="mt-1 h-2 rounded-full bg-zinc-100">
                   <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${intelligence.status.normalSourceRate}%` }} />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between text-xs text-zinc-500">
-                  <span>抓取失败待检</span>
-                  <span>{intelligence.status.sourcesWaitingReview}</span>
-                </div>
-                <div className="mt-1 h-2 rounded-full bg-zinc-100">
-                  <div className="h-2 rounded-full bg-amber-500" style={{ width: `${Math.min(100, intelligence.status.sourcesWaitingReview * 2)}%` }} />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between text-xs text-zinc-500">
-                  <span>人工待处理</span>
-                  <span>{intelligence.status.pendingReview}</span>
-                </div>
-                <div className="mt-1 h-2 rounded-full bg-zinc-100">
-                  <div className="h-2 rounded-full bg-teal-500" style={{ width: `${Math.min(100, intelligence.status.pendingReview * 10)}%` }} />
                 </div>
               </div>
             </div>
@@ -1395,1336 +705,401 @@ export default function Home() {
         </aside>
 
         <section className="min-w-0">
-          {activeView === "简报" && (
+          {activeView === "竞品情报" && (
             <div className="grid gap-5">
-              <section className="rounded-md border border-zinc-200 bg-white p-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold">日报质量状态</h2>
-                    <p className="mt-1 text-sm text-zinc-500">
-                      {intelligence.status.normalSourceRate >= 90 ? "正常" : intelligence.status.normalSourceRate >= 70 ? "部分异常" : "高风险异常"} ·
-                      抓取成功率 {intelligence.status.normalSourceRate}% · 抓取失败待检 {intelligence.status.sourcesWaitingReview} · 人工待处理 {intelligence.status.pendingReview}
-                    </p>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-4">
-                    {[
-                      ["今日新增", intelligence.status.newItemsToday],
-                      ["重点信息", priorityEvents.length],
-                      ["候选洞察", candidateInsights.length],
-                      ["人工待处理", intelligence.status.pendingReview],
-                    ].map(([label, value]) => (
-                      <div key={label} className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
-                        <p className="text-xs font-semibold text-zinc-500">{label}</p>
-                        <p className="mt-1 text-2xl font-semibold">{value}</p>
-                      </div>
-                    ))}
-                  </div>
+              <section className="bg-white px-5 py-5">
+                <SectionHeader
+                  eyebrow="Competitor"
+                  title="竞品情报"
+                  summary="聚合竞品官方账号、官网发布和第三方媒体中明确提到竞品的内容，优先提炼产品动作、价格活动、节点覆盖、内容营销和合作投放。"
+                  right={<Badge className="border-teal-200 bg-teal-50 text-teal-700">官方信源 {officialCompetitorSources}</Badge>}
+                />
+                <div className="mt-5 grid gap-3 md:grid-cols-4">
+                  <Metric label="最新动态" value={competitorItems.length} hint="来自已抓取信息" />
+                  <Metric label="官方/自有信源" value={officialCompetitorSources} />
+                  <Metric label="第三方竞品内容" value={managedSources.filter((source) => sourceCategoryLabel(source.category) === "第三方媒体").length} />
+                  <Metric label="今日排期" value={managedSources.filter((source) => inferSourcePanel(source) === "竞品情报" && shouldCrawlToday(source)).length} />
                 </div>
-                <p className="mt-4 rounded-md bg-zinc-50 p-3 text-sm leading-6 text-zinc-600">
-                  阅读提示：政策监管和竞品官方动作可作为高优先级 L0 单点事件；L2 候选洞察必须同时具备用户需求、限制原因、VPN 相关性、频率和来源可信度。
-                </p>
+              </section>
+
+              <section className="grid gap-4 xl:grid-cols-[1.5fr_0.8fr]">
+                <div className="grid gap-3">
+                  {competitorItems.map((item) => <EvidenceCard key={item.id} item={item} />)}
+                </div>
+                <div className="grid gap-4">
+                  <section className="rounded-md border border-zinc-200 bg-white p-4">
+                    <h3 className="font-semibold">重点竞品</h3>
+                    <div className="mt-4 grid gap-3">
+                      {competitorNames.map((name) => {
+                        const count = competitorItems.filter((item) => `${item.title} ${item.summary}`.toLowerCase().includes(name.toLowerCase())).length;
+                        return (
+                          <div key={name} className="flex items-center justify-between gap-3 border-b border-zinc-100 pb-3 last:border-0 last:pb-0">
+                            <span className="text-sm font-semibold">{name}</span>
+                            <Badge className={count > 0 ? "border-teal-200 bg-teal-50 text-teal-700" : "border-zinc-200 bg-zinc-50 text-zinc-600"}>{count} 条</Badge>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                  <section className="rounded-md border border-zinc-200 bg-white p-4">
+                    <h3 className="font-semibold">今日判断口径</h3>
+                    <p className="mt-3 text-sm leading-6 text-zinc-600">
+                      只把明确来自官方渠道，或第三方媒体中直接描述竞品动作的信息放到这里。泛行业报道会进入历史库，不在竞品情报里放大。
+                    </p>
+                  </section>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {activeView === "用户声音" && (
+            <div className="grid gap-5">
+              <section className="bg-white px-5 py-5">
+                <SectionHeader
+                  eyebrow="User Voice"
+                  title="用户声音"
+                  summary="汇总 Reddit、论坛、问答社区、评论区等公开讨论，关注用户想访问什么、遇到什么限制，以及是否自然产生 VPN 使用动机。"
+                  right={<Badge className="border-indigo-200 bg-indigo-50 text-indigo-700">论坛/社区信源 {userForumSources}</Badge>}
+                />
+                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                  <Metric label="用户讨论" value={userVoiceItems.length} />
+                  <Metric label="高热主题" value={intelligence.themes.filter((theme) => theme.type === "需求型" && theme.priority === "高").length} />
+                  <Metric label="今日排期" value={managedSources.filter((source) => inferSourcePanel(source) === "用户声音" && shouldCrawlToday(source)).length} />
+                </div>
+              </section>
+
+              <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+                {userVoiceItems.map((item) => <EvidenceCard key={item.id} item={item} compact />)}
               </section>
 
               <section className="rounded-md border border-zinc-200 bg-white p-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold">今日处理队列</h2>
-                    <p className="mt-1 text-sm text-zinc-500">先处理可影响增长判断的核验、补链和机会确认</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setActiveView("标签体系")}
-                    className="h-9 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-600 hover:text-zinc-950"
-                  >
-                    标签说明
-                  </button>
-                </div>
-                <div className="mt-5 grid gap-3 lg:grid-cols-3">
-                  {todayActionItems.map((item) => (
-                    <article key={item.title} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
+                <h3 className="font-semibold">正在升温的讨论主题</h3>
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  {intelligence.themes.filter((theme) => theme.type === "需求型").map((theme) => (
+                    <article key={theme.id} className="rounded-md border border-zinc-200 p-4">
                       <div className="flex flex-wrap gap-2">
-                        <Badge className={reviewStatusStyles[item.status]}>{item.status}</Badge>
-                        <Badge className="border-zinc-200 bg-white text-zinc-600">{item.source}</Badge>
+                        <Badge className={priorityStyles[theme.priority]}>{theme.priority}</Badge>
+                        <Badge className={trendStyles[theme.trend] ?? trendStyles["稳定"]}>{theme.trend}</Badge>
                       </div>
-                      <h3 className="mt-3 text-sm font-semibold">{item.title}</h3>
-                      <p className="mt-2 text-xs leading-5 text-zinc-500">{item.reason}</p>
-                      <div className="mt-4 grid gap-1 text-xs text-zinc-500">
-                        <span>负责人：{item.owner}</span>
-                        <span>时间：{item.due}</span>
-                      </div>
+                      <h4 className="mt-3 text-sm font-semibold">{theme.title}</h4>
+                      <p className="mt-2 text-xs leading-5 text-zinc-500">{theme.summary}</p>
+                      <p className="mt-3 text-xs font-semibold text-teal-700">核心证据 {theme.coreEvidence} · 用户市场 {theme.market}</p>
                     </article>
                   ))}
                 </div>
               </section>
-
-              <section className="rounded-md border border-zinc-200 bg-white p-5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold">高优先级简报</h2>
-                    <p className="mt-1 text-sm text-zinc-500">
-                      今日新增 {intelligence.status.newItemsToday} · 高优先级 {intelligence.status.highPriorityToday} · 待确认 {intelligence.status.pendingReview}
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 rounded-md border border-zinc-200 bg-zinc-50 p-1">
-                    {[
-                      ["daily", "每日"],
-                      ["weekly", "每周"],
-                    ].map(([key, label]) => (
-                      <button
-                        key={key}
-                        onClick={() => setBriefingPeriod(key as "daily" | "weekly")}
-                        className={`h-9 rounded px-4 text-sm font-semibold ${
-                          briefingPeriod === key ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-500"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-5 grid gap-3">
-                  {visibleBriefing.map((item) => {
-                    const itemUrl = item.url ?? sourceUrlByTitle.get(item.title);
-                    const displayPriority = inferBriefingDisplayPriority(item);
-                    const linkQuality = sourceLinkQuality(itemUrl);
-                    const reviewStatus: ReviewStatus = linkQuality === "原始链接" ? "系统建议" : "待确认";
-                    return (
-                      <article key={item.id} className="rounded-md border border-zinc-200 p-4">
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                          <div className="min-w-0">
-                            <SourceTagRow
-                              tags={compactSourceTags({
-                                sourceType: sourceTypeFromBriefing(item),
-                                source: item.source,
-                                title: item.title,
-                                summary: item.summary,
-                                originalTitle: item.originalTitle,
-                                url: itemUrl,
-                              })}
-                            />
-                            <h3 className="mt-3 break-words text-lg font-semibold">{item.title}</h3>
-                            <p className="mt-2 max-w-3xl break-words text-sm leading-6 text-zinc-600">{item.summary}</p>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              <Badge className={reviewStatusStyles[reviewStatus]}>{reviewStatus}</Badge>
-                              <Badge className={linkQualityStyles[linkQuality]}>{linkQuality}</Badge>
-                              <Badge className="border-zinc-200 bg-zinc-50 text-zinc-700">{item.type}</Badge>
-                              <Badge className={trendStyles[item.trend]}>{item.trend}</Badge>
-                              <Badge className={displayPriorityStyles[displayPriority]}>{displayPriority}</Badge>
-                            </div>
-                            <SourceDisclosure url={itemUrl} originalTitle={item.originalTitle} className="mt-3" />
-                          </div>
-                          <div className="grid min-w-36 gap-1 text-sm text-zinc-500">
-                            <span>{item.source}</span>
-                            <span>{item.evidence} 条核心证据</span>
-                            <span>{item.time}</span>
-                          </div>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </section>
-
-              <section className="grid gap-5 xl:grid-cols-2">
-                <div className="rounded-md border border-zinc-200 bg-white p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h2 className="text-xl font-semibold">竞品官方信源</h2>
-                      <p className="mt-1 text-sm text-zinc-500">只收官网、价格页、官方账号等原始官方链接</p>
-                    </div>
-                    <span className="rounded bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-600">{officialCompetitorItems.length} 条</span>
-                  </div>
-                  <div className="mt-5 grid gap-3">
-                    {officialCompetitorItems.map((item) => (
-                      <article key={item.id} className="rounded-md border border-zinc-200 p-4">
-                        <SourceTagRow tags={item.sourceTags} />
-                        <h3 className="mt-3 break-words text-sm font-semibold">{item.title}</h3>
-                        <p className="mt-2 break-words text-xs leading-5 text-zinc-500">{item.summary}</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Badge className={reviewStatusStyles[item.reviewStatus]}>{item.reviewStatus}</Badge>
-                          <Badge className={linkQualityStyles[item.linkQuality]}>{item.linkQuality}</Badge>
-                        </div>
-                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                          <span>{item.source}</span>
-                          <span>{item.time}</span>
-                        </div>
-                        <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-3" />
-                      </article>
-                    ))}
-                    {officialCompetitorItems.length === 0 && (
-                      <div className="rounded-md border border-dashed border-zinc-200 p-6 text-sm text-zinc-500">
-                        今日暂无竞品官方信源信息
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="rounded-md border border-zinc-200 bg-white p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h2 className="text-xl font-semibold">用户论坛声音</h2>
-                      <p className="mt-1 text-sm text-zinc-500">只看 Reddit、论坛、社区等用户主动发布的需求和限制反馈</p>
-                    </div>
-                    <span className="rounded bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-600">{userForumItems.length} 条</span>
-                  </div>
-                  <div className="mt-5 grid gap-3">
-                    {userForumItems.map((item) => (
-                      <article key={item.id} className="rounded-md border border-zinc-200 p-4">
-                        <SourceTagRow tags={item.sourceTags} />
-                        <h3 className="mt-3 break-words text-sm font-semibold">{item.title}</h3>
-                        {item.rawNeed && (
-                          <p className="mt-2 rounded-md bg-zinc-50 p-3 text-xs leading-5 text-zinc-700">
-                            <span className="font-semibold">原始需求句：</span>
-                            {item.rawNeed}
-                          </p>
-                        )}
-                        <p className="mt-2 break-words text-xs leading-5 text-zinc-500">{item.summary}</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Badge className={reviewStatusStyles[item.reviewStatus]}>{item.reviewStatus}</Badge>
-                          <Badge className={linkQualityStyles[item.linkQuality]}>{item.linkQuality}</Badge>
-                          {item.discussionHeat && <Badge className="border-zinc-200 bg-white text-zinc-600">讨论热度 {item.discussionHeat}</Badge>}
-                        </div>
-                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                          <span>{item.source}</span>
-                          <span>{item.time}</span>
-                        </div>
-                        <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-3" />
-                      </article>
-                    ))}
-                    {userForumItems.length === 0 && (
-                      <div className="rounded-md border border-dashed border-zinc-200 p-6 text-sm text-zinc-500">
-                        今日暂无用户论坛声音
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </section>
-
-              <section className="grid gap-5 xl:grid-cols-2">
-                <div className="rounded-md border border-zinc-200 bg-white p-5">
-                  <h2 className="text-xl font-semibold">重点事件池</h2>
-                  <div className="mt-5 grid gap-3">
-                    {priorityEvents.map((item) => (
-                      <article key={item.id} className="rounded-md border border-zinc-200 p-4">
-                        <SourceTagRow tags={item.sourceTags} />
-                        <h3 className="mt-3 break-words text-sm font-semibold">{item.title}</h3>
-                        <p className="mt-2 break-words text-xs leading-5 text-zinc-500">{item.summary}</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Badge className={reviewStatusStyles[item.reviewStatus]}>{item.reviewStatus}</Badge>
-                          <Badge className={linkQualityStyles[item.linkQuality]}>{item.linkQuality}</Badge>
-                          <Badge className={displayPriorityStyles[item.displayPriority]}>{item.displayPriority}</Badge>
-                          <Badge className={maturityStyles[item.maturity]}>{item.maturity}</Badge>
-                        </div>
-                        <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-3" />
-                      </article>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-md border border-zinc-200 bg-white p-5">
-                  <h2 className="text-xl font-semibold">L2 候选洞察池</h2>
-                  <div className="mt-5 grid gap-3">
-                    {candidateInsights.slice(0, 5).map((theme) => (
-                      <button
-                        key={theme.id}
-                        onClick={() => {
-                          setSelectedThemeId(theme.id);
-                          setActiveView("主题库");
-                        }}
-                        className="rounded-md border border-zinc-200 p-4 text-left transition hover:bg-zinc-50"
-                      >
-                        <div className="flex flex-wrap gap-2">
-                          <Badge className={maturityStyles[theme.score.suggested]}>{theme.score.suggested}</Badge>
-                          <Badge className={trendStyles[theme.trend]}>{theme.trend}</Badge>
-                          <Badge className={displayPriorityStyles[theme.priority === "高" ? "P1" : "P2"]}>{theme.priority === "高" ? "P1" : "P2"}</Badge>
-                        </div>
-                        <h3 className="mt-3 break-words text-sm font-semibold">{theme.title}</h3>
-                        <p className="mt-2 break-words text-xs leading-5 text-zinc-500">{theme.summary}</p>
-                        <p className="mt-3 text-xs font-semibold text-teal-700">L2 分数 {theme.score.total}/10 · 核心证据 {theme.coreEvidence}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </section>
-
-              <section className="grid gap-5 xl:grid-cols-3">
-                <div className="rounded-md border border-zinc-200 bg-white p-5 xl:col-span-2">
-                  <h2 className="text-xl font-semibold">需求 × 竞品关联</h2>
-                  <div className="mt-5 grid gap-3">
-                    {intelligence.themeRelations.map(({ leftThemeId, rightThemeId, level, reason }) => {
-                      const leftTheme = intelligence.themes.find((theme) => theme.id === leftThemeId);
-                      const rightTheme = intelligence.themes.find((theme) => theme.id === rightThemeId);
-                      return (
-                        <div key={`${leftThemeId}-${rightThemeId}`} className="grid gap-3 rounded-md border border-zinc-200 p-4 md:grid-cols-[1fr_auto_1fr] md:items-center">
-                          <p className="text-sm font-semibold">{leftTheme?.title}</p>
-                          <div className="text-center text-xs font-semibold text-teal-700">
-                            {level}
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold">{rightTheme?.title}</p>
-                            <p className="mt-1 text-xs text-zinc-500">{reason}</p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="rounded-md border border-zinc-200 bg-white p-5">
-                  <h2 className="text-xl font-semibold">本周机会入口</h2>
-                  <div className="mt-5 grid gap-4">
-                    {intelligence.opportunities.map((opportunity) => (
-                      <div key={opportunity.id} className="border-b border-zinc-100 pb-4 last:border-0 last:pb-0">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-semibold">{opportunity.title}</p>
-                          <Badge className="border-teal-200 bg-teal-50 text-teal-700">{opportunity.type}</Badge>
-                        </div>
-                        <p className="mt-2 text-xs leading-5 text-zinc-500">{opportunity.nextStep}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </section>
-
-              <section className="grid gap-5 xl:grid-cols-2">
-                <div className="rounded-md border border-zinc-200 bg-white p-5">
-                  <h2 className="text-xl font-semibold">需求触发对象</h2>
-                  <div className="mt-5 grid gap-3">
-                    {demandObjects.map((object) => (
-                      <div key={object.name} className="rounded-md border border-zinc-200 p-4">
-                        <div className="flex flex-wrap gap-2">
-                          <Badge className={maturityStyles[object.maturity]}>{object.maturity}</Badge>
-                          <Badge className="border-zinc-200 bg-zinc-50 text-zinc-700">{object.category}</Badge>
-                          <Badge className="border-rose-200 bg-rose-50 text-rose-700">热度 {object.heat}</Badge>
-                        </div>
-                        <h3 className="mt-3 text-sm font-semibold">{object.name}</h3>
-                        <p className="mt-2 text-xs leading-5 text-zinc-500">
-                          {object.restriction} · {object.platform} · {object.markets} · {object.status}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-md border border-zinc-200 bg-white p-5">
-                  <h2 className="text-xl font-semibold">分类信息压缩区</h2>
-                  <div className="mt-5 grid gap-3">
-                    {categorySummaries.map((item) => (
-                      <div key={item.category} className="rounded-md border border-zinc-200 p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold">{item.category}</p>
-                            <p className="mt-1 text-xs leading-5 text-zinc-500">{item.summary}</p>
-                          </div>
-                          <div className="text-right text-xs text-zinc-500">
-                            <p>信息 {item.total}</p>
-                            <p>重点 {item.important}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </section>
             </div>
           )}
 
-          {activeView === "主题库" && (
+          {activeView === "增长热点" && (
             <div className="grid gap-5">
-              <section className="rounded-md border border-zinc-200 bg-white p-5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold">全部主题库</h2>
-                    <p className="mt-1 text-sm text-zinc-500">
-                      主题 {intelligence.themes.length} · 高优先级 {highThemeCount} · 人工修正 {manualReviewCount}
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-3 rounded-md border border-zinc-200 bg-zinc-50 p-1">
-                    {["全部", "需求型", "动作型"].map((filter) => (
-                      <button
-                        key={filter}
-                        onClick={() => setThemeFilter(filter as "全部" | ThemeType)}
-                        className={`h-9 rounded px-3 text-sm font-semibold ${
-                          themeFilter === filter ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-500"
-                        }`}
-                      >
-                        {filter}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-5 overflow-x-auto rounded-md border border-zinc-200">
-                  <div className="grid min-w-[820px] grid-cols-[1.7fr_0.7fr_0.8fr_0.7fr_0.7fr] bg-zinc-50 px-4 py-3 text-xs font-semibold text-zinc-500">
-                    <span>主题</span>
-                    <span>市场</span>
-                    <span>平台/竞品</span>
-                    <span>趋势</span>
-                    <span>证据</span>
-                  </div>
-                  {visibleThemes.map((theme) => {
-                    const themeEvidence = intelligence.evidence.filter((item) => item.themeId === theme.id);
-                    const themeRelations = intelligence.themeRelations.filter(
-                      (relation) => relation.leftThemeId === theme.id || relation.rightThemeId === theme.id,
-                    );
-                    const themeOpportunity = intelligence.opportunities.find((opportunity) => opportunity.themeId === theme.id);
-                    const themeScore = scoreTheme(theme);
-                    const themeMaturity = inferThemeMaturity(theme);
-                    const isSelected = selectedTheme.id === theme.id;
-                    return (
-                      <div key={theme.id} className="min-w-[820px] border-t border-zinc-200">
+              <section className="bg-white px-5 py-5">
+                <SectionHeader
+                  eyebrow="Growth Hotspots"
+                  title="增长热点"
+                  summary="按影视、体育、游戏三个高频内容场景观察全球热度、播放平台、地区限制和用户讨论，再判断是否满足 VPN 相关标准。"
+                  right={
+                    <div className="grid grid-cols-3 rounded-md border border-zinc-200 bg-zinc-50 p-1">
+                      {hotspotViews.map((view) => (
                         <button
-                          onClick={() => setSelectedThemeId(theme.id)}
-                          className={`grid w-full grid-cols-[1.7fr_0.7fr_0.8fr_0.7fr_0.7fr] items-center gap-3 px-4 py-4 text-left transition hover:bg-zinc-50 ${
-                            isSelected ? "bg-teal-50/60" : "bg-white"
-                          }`}
+                          key={view}
+                          type="button"
+                          onClick={() => setHotspotView(view)}
+                          className={`h-9 rounded px-4 text-sm font-semibold ${hotspotView === view ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-500"}`}
                         >
-                          <span>
-                            <span className="block break-words text-sm font-semibold">{theme.title}</span>
-                            <span className="mt-1 block break-words text-xs text-zinc-500">{theme.type} · {theme.summary}</span>
-                            <span className="mt-2 flex flex-wrap gap-2">
-                              <Badge className={maturityStyles[themeMaturity]}>{themeMaturity}</Badge>
-                              <Badge className={displayPriorityStyles[theme.priority === "高" ? "P1" : "P2"]}>{theme.priority === "高" ? "P1" : "P2"}</Badge>
-                              <Badge className="border-zinc-200 bg-white text-zinc-600">L2分 {themeScore.total}/10</Badge>
-                            </span>
-                          </span>
-                          <span className="text-sm text-zinc-600">{theme.market}</span>
-                          <span className="text-sm text-zinc-600">{theme.type === "需求型" ? theme.platform : theme.competitor}</span>
-                          <span>
-                            <Badge className={trendStyles[theme.trend]}>{theme.trend}</Badge>
-                          </span>
-                          <span className="flex items-center gap-3">
-                            <MiniBars current={theme.currentEvidence} previous={theme.previousEvidence} />
-                            <span className="text-xs text-zinc-500">{theme.currentEvidence}/{theme.previousEvidence}</span>
-                          </span>
+                          {view}
                         </button>
-                        {isSelected && (
-                          <div className="grid gap-3 bg-white px-4 pb-4 md:grid-cols-3">
-                            <div className="rounded-md border border-teal-100 bg-teal-50/60 p-3">
-                              <p className="text-xs font-semibold text-teal-800">相关证据</p>
-                              <div className="mt-2 grid gap-2">
-                                {themeEvidence.slice(0, 3).map((item) => (
-                                  <div key={item.id} className="rounded bg-white/70 p-2">
-                                    <SourceTagRow tags={compactSourceTags(item)} />
-                                    <p className="mt-2 break-words text-xs leading-5 text-zinc-700">{item.title}</p>
-                                    <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-1" />
-                                  </div>
-                                ))}
-                                {themeEvidence.length === 0 && <p className="text-xs text-zinc-500">暂无证据</p>}
-                              </div>
-                            </div>
-                            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-                              <p className="text-xs font-semibold text-zinc-600">关联主题</p>
-                              <div className="mt-2 grid gap-2">
-                                {themeRelations.map((relation) => {
-                                  const linkedId = relation.leftThemeId === theme.id ? relation.rightThemeId : relation.leftThemeId;
-                                  const linkedTheme = intelligence.themes.find((item) => item.id === linkedId);
-                                  return (
-                                    <p key={`${relation.leftThemeId}-${relation.rightThemeId}`} className="break-words text-xs leading-5 text-zinc-700">
-                                      {relation.level} · {linkedTheme?.title}
-                                    </p>
-                                  );
-                                })}
-                                {themeRelations.length === 0 && <p className="text-xs text-zinc-500">暂无关联主题</p>}
-                              </div>
-                            </div>
-                            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-                              <p className="text-xs font-semibold text-zinc-600">机会状态</p>
-                              <p className="mt-2 break-words text-xs leading-5 text-zinc-700">
-                                {themeOpportunity ? `${themeOpportunity.status} · ${themeOpportunity.nextStep}` : "尚未进入机会池"}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                      ))}
+                    </div>
+                  }
+                />
+                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                  <Metric label="影视信源" value={managedSources.filter((source) => /影视|流媒体|netflix|bbc|hulu|disney/i.test(`${source.name} ${source.secondaryCategory} ${source.url}`)).length} />
+                  <Metric label="体育信源" value={managedSources.filter((source) => /体育|赛事|f1|world cup|espn/i.test(`${source.name} ${source.secondaryCategory} ${source.url}`)).length} />
+                  <Metric label="游戏信源" value={managedSources.filter((source) => /游戏|电竞|steamdb|steam|gaming/i.test(`${source.name} ${source.secondaryCategory} ${source.url}`)).length} />
                 </div>
               </section>
 
-              <section className="rounded-md border border-zinc-200 bg-white p-5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="border-zinc-200 bg-zinc-50 text-zinc-700">{selectedTheme.type}</Badge>
-                  <Badge className={maturityStyles[inferThemeMaturity(selectedTheme)]}>{inferThemeMaturity(selectedTheme)}</Badge>
-                  <Badge className={displayPriorityStyles[selectedTheme.priority === "高" ? "P1" : "P2"]}>{selectedTheme.priority === "高" ? "P1" : "P2"}</Badge>
-                  <Badge className={trendStyles[selectedTheme.trend]}>{selectedTheme.trend}</Badge>
-                  <span className={`inline-flex h-7 items-center rounded-full px-3 text-xs font-semibold ${priorityStyles[selectedTheme.priority]}`}>
-                    {selectedTheme.priority}优先级
-                  </span>
-                </div>
-                <h2 className="mt-3 text-2xl font-semibold">{selectedTheme.title}</h2>
-                <p className="mt-3 max-w-4xl text-sm leading-6 text-zinc-600">{selectedTheme.summary}</p>
-                <div className="mt-5 grid gap-3 md:grid-cols-4">
-                  {[
-                    ["用户市场", selectedTheme.market],
-                    ["关联平台", selectedTheme.platform],
-                    ["关联竞品", selectedTheme.competitor],
-                    ["更新时间", selectedTheme.updatedAt],
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-                      <p className="text-xs font-semibold text-zinc-500">{label}</p>
-                      <p className="mt-1 text-sm font-semibold">{value}</p>
+              <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {hotspots[hotspotView].map((theme) => (
+                  <article key={theme.id} className="rounded-md border border-zinc-200 bg-white p-4">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge className={priorityStyles[theme.priority]}>{theme.priority}</Badge>
+                      <Badge className={trendStyles[theme.trend] ?? trendStyles["稳定"]}>{theme.trend}</Badge>
+                      <Badge className="border-zinc-200 bg-white text-zinc-600">{theme.market}</Badge>
                     </div>
-                  ))}
-                </div>
-                <div className="mt-5 rounded-md border border-zinc-200 bg-zinc-50 p-4">
-                  <p className="text-sm font-semibold">L2 评分链路</p>
-                  <div className="mt-3 grid gap-2 md:grid-cols-5">
-                    {[
-                      ["用户需求", scoreTheme(selectedTheme).demand],
-                      ["限制原因", scoreTheme(selectedTheme).restriction],
-                      ["VPN相关性", scoreTheme(selectedTheme).vpnFit],
-                      ["热度/频率", scoreTheme(selectedTheme).frequency],
-                      ["来源交叉", scoreTheme(selectedTheme).sourceMix],
-                    ].map(([label, value]) => (
-                      <div key={label} className="rounded bg-white p-3">
-                        <p className="text-xs font-semibold text-zinc-500">{label}</p>
-                        <p className="mt-1 text-lg font-semibold">{value}/2</p>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="mt-3 text-xs leading-5 text-zinc-500">
-                    总分 {scoreTheme(selectedTheme).total}/10 · 建议成熟度 {scoreTheme(selectedTheme).suggested}。限制原因或 VPN 相关性为 0 时，不自动升级 L2。
-                  </p>
-                </div>
-                <div className="mt-5 rounded-md border border-teal-200 bg-teal-50/60 p-4">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <h3 className="text-lg font-semibold">人工修正</h3>
-                    <Badge className="border-teal-200 bg-white text-teal-700">本机草稿</Badge>
-                  </div>
-                  <div className="mt-4 grid gap-4 lg:grid-cols-4">
-                    <div className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">优先级修正</span>
-                      <SegmentedButtons<Priority>
-                        value={selectedManualReview.priority}
-                        options={["高", "中", "低"]}
-                        onChange={(priority) => updateManualReview({ priority })}
-                      />
+                    <h3 className="mt-3 font-semibold">{theme.title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-zinc-600">{theme.summary}</p>
+                    <div className="mt-4 grid gap-1 text-xs text-zinc-500">
+                      <span>平台/对象：{theme.platform || "待识别"}</span>
+                      <span>核心证据：{theme.coreEvidence}</span>
+                      <span>VPN 标准：有地区、版权、平台或网络限制时进入机会观察</span>
                     </div>
-                    <div className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">综合评级</span>
-                      <SegmentedButtons<Priority>
-                        value={selectedManualReview.rating}
-                        options={["高", "中", "低"]}
-                        onChange={(rating) => updateManualReview({ rating })}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">需求强度</span>
-                      <SegmentedButtons<Priority>
-                        value={selectedManualReview.demandStrength}
-                        options={["高", "中", "低"]}
-                        onChange={(demandStrength) => updateManualReview({ demandStrength })}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">竞品响应</span>
-                      <SegmentedButtons<Priority>
-                        value={selectedManualReview.competitorResponse}
-                        options={["高", "中", "低"]}
-                        onChange={(competitorResponse) => updateManualReview({ competitorResponse })}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">可执行性</span>
-                      <SegmentedButtons<Priority>
-                        value={selectedManualReview.actionability}
-                        options={["高", "中", "低"]}
-                        onChange={(actionability) => updateManualReview({ actionability })}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">风险提示</span>
-                      <SegmentedButtons<Priority>
-                        value={selectedManualReview.risk}
-                        options={["高", "中", "低"]}
-                        onChange={(risk) => updateManualReview({ risk })}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">关联确认</span>
-                      <SegmentedButtons<ManualReview["relationDecision"]>
-                        value={selectedManualReview.relationDecision}
-                        options={["已确认", "待确认", "不关联"]}
-                        onChange={(relationDecision) => updateManualReview({ relationDecision })}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">机会决策</span>
-                      <SegmentedButtons<ManualReview["opportunityDecision"]>
-                        value={selectedManualReview.opportunityDecision}
-                        options={["进入机会池", "继续观察", "暂不处理"]}
-                        onChange={(opportunityDecision) => updateManualReview({ opportunityDecision })}
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-                    <div>
-                      <p className="text-xs font-semibold text-zinc-500">建议动作</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {actionOptions.map((action) => {
-                          const checked = selectedManualReview.actions.includes(action);
-                          return (
-                            <button
-                              key={action}
-                              onClick={() => toggleManualAction(action)}
-                              className={`h-9 rounded-md border px-3 text-sm font-semibold transition ${
-                                checked
-                                  ? "border-teal-500 bg-white text-teal-800"
-                                  : "border-zinc-200 bg-zinc-50 text-zinc-500 hover:text-zinc-950"
-                              }`}
-                            >
-                              {action}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <label className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">备注</span>
-                      <textarea
-                        value={selectedManualReview.note}
-                        onChange={(event) => updateManualReview({ note: event.target.value })}
-                        rows={4}
-                        className="min-h-28 resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 outline-none transition focus:border-teal-500"
-                        placeholder="人工判断、风险边界、后续验证点"
-                      />
-                    </label>
-                  </div>
-                </div>
-                <div className="mt-5 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-md border border-zinc-200 p-4">
-                    <p className="text-sm font-semibold">核心证据</p>
-                    <div className="mt-3 grid gap-3">
-                      {selectedEvidence.filter((item) => item.role === "核心证据").map((item) => (
-                        <div key={item.id} className="rounded bg-zinc-50 p-3">
-                          <SourceTagRow tags={compactSourceTags(item)} />
-                          <p className="mt-2 break-words text-sm leading-6 text-zinc-700">{item.title}</p>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <Badge className={reviewStatusStyles[item.reviewStatus ?? (sourceLinkQuality(item.url) === "原始链接" ? "系统建议" : "待确认")]}>
-                              {item.reviewStatus ?? (sourceLinkQuality(item.url) === "原始链接" ? "系统建议" : "待确认")}
-                            </Badge>
-                            <Badge className={linkQualityStyles[sourceLinkQuality(item.url)]}>{sourceLinkQuality(item.url)}</Badge>
-                          </div>
-                          <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-1" />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="rounded-md border border-zinc-200 p-4">
-                    <p className="text-sm font-semibold">参考信息</p>
-                    <div className="mt-3 grid gap-3">
-                      {selectedEvidence.filter((item) => item.role === "参考信息").map((item) => (
-                        <div key={item.id} className="rounded bg-zinc-50 p-3">
-                          <SourceTagRow tags={compactSourceTags(item)} />
-                          <p className="mt-2 break-words text-sm leading-6 text-zinc-700">{item.title}</p>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <Badge className={reviewStatusStyles[item.reviewStatus ?? (sourceLinkQuality(item.url) === "原始链接" ? "系统建议" : "待确认")]}>
-                              {item.reviewStatus ?? (sourceLinkQuality(item.url) === "原始链接" ? "系统建议" : "待确认")}
-                            </Badge>
-                            <Badge className={linkQualityStyles[sourceLinkQuality(item.url)]}>{sourceLinkQuality(item.url)}</Badge>
-                          </div>
-                          <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-1" />
-                        </div>
-                      ))}
-                      {selectedEvidence.filter((item) => item.role === "参考信息").length === 0 && (
-                        <p className="text-sm text-zinc-500">暂无参考信息</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-5 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-md border border-zinc-200 p-4">
-                    <p className="text-sm font-semibold">关联判断</p>
-                    <div className="mt-3 grid gap-3">
-                      {selectedRelations.map((relation) => {
-                        const linkedId = relation.leftThemeId === selectedTheme.id ? relation.rightThemeId : relation.leftThemeId;
-                        const linkedTheme = intelligence.themes.find((theme) => theme.id === linkedId);
-                        return (
-                          <div key={`${relation.leftThemeId}-${relation.rightThemeId}`} className="rounded bg-zinc-50 p-3">
-                            <p className="break-words text-sm font-semibold text-zinc-700">{relation.level} · {linkedTheme?.title}</p>
-                            <p className="mt-1 break-words text-xs leading-5 text-zinc-500">{relation.reason}</p>
-                          </div>
-                        );
-                      })}
-                      {selectedRelations.length === 0 && <p className="text-sm text-zinc-500">暂无关联判断</p>}
-                    </div>
-                  </div>
-                  <div className="rounded-md border border-zinc-200 p-4">
-                    <p className="text-sm font-semibold">机会建议</p>
-                    <div className="mt-3 grid gap-3">
-                      {selectedOpportunities.map((opportunity) => (
-                        <div key={opportunity.id} className="rounded bg-zinc-50 p-3">
-                          <div className="flex flex-wrap gap-2">
-                            <Badge className="border-cyan-200 bg-cyan-50 text-cyan-700">{opportunity.type}</Badge>
-                            <Badge className="border-amber-200 bg-amber-50 text-amber-800">{opportunity.feasibility}</Badge>
-                            <Badge className="border-zinc-200 bg-white text-zinc-700">{opportunity.status}</Badge>
-                          </div>
-                          <p className="mt-2 break-words text-sm font-semibold">{opportunity.title}</p>
-                          <p className="mt-1 break-words text-xs leading-5 text-zinc-500">{opportunity.nextStep}</p>
-                        </div>
-                      ))}
-                      {selectedOpportunities.length === 0 && <p className="text-sm text-zinc-500">尚未进入机会池</p>}
-                    </div>
-                  </div>
-                </div>
+                  </article>
+                ))}
               </section>
             </div>
           )}
 
-          {activeView === "证据库" && (
-            <section className="rounded-md border border-zinc-200 bg-white p-5">
-              <h2 className="text-xl font-semibold">历史信息库</h2>
-              <p className="mt-1 text-sm text-zinc-500">核心证据 {coreEvidenceCount} · 参考信息 {referenceEvidenceCount} · 最近更新 {lastUpdatedTime}</p>
-              <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_180px_160px]">
-                <input
-                  value={historyQuery}
-                  onChange={(event) => setHistoryQuery(event.target.value)}
-                  className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500"
-                  placeholder="搜索标题、摘要、来源或原始标题"
-                />
-                <select
-                  value={historyCategory}
-                  onChange={(event) => setHistoryCategory(event.target.value)}
-                  className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500"
-                >
-                  {["全部", ...sourceCategories].map((category) => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
-                </select>
-                <select
-                  value={historyPriority}
-                  onChange={(event) => setHistoryPriority(event.target.value as "全部" | DisplayPriority)}
-                  className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500"
-                >
-                  {["全部", "P0", "P1", "P2", "P3"].map((priority) => (
-                    <option key={priority} value={priority}>{priority}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="mt-5 grid gap-3">
-                {visibleHistory.map((item) => (
-                  <article key={item.id} className="rounded-md border border-zinc-200 p-4">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div className="min-w-0">
-                        <SourceTagRow tags={item.sourceTags} />
-                        <h3 className="mt-3 break-words text-base font-semibold">{item.title}</h3>
-                        <p className="mt-2 break-words text-sm leading-6 text-zinc-600">{item.summary}</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Badge className={reviewStatusStyles[item.reviewStatus]}>{item.reviewStatus}</Badge>
-                          <Badge className={linkQualityStyles[item.linkQuality]}>{item.linkQuality}</Badge>
-                          <Badge className={item.role === "核心证据" ? "border-teal-200 bg-teal-50 text-teal-700" : "border-zinc-200 bg-zinc-50 text-zinc-600"}>
-                            {item.role}
-                          </Badge>
-                          <Badge className={displayPriorityStyles[item.displayPriority]}>{item.displayPriority}</Badge>
-                        </div>
-                        <SourceDisclosure url={item.url} originalTitle={item.originalTitle} className="mt-3" />
-                      </div>
-                      <div className="min-w-36 text-sm text-zinc-500">
-                        <p>{item.source}</p>
-                        <p className="mt-1">{item.time}</p>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-                {visibleHistory.length === 0 && (
-                  <div className="rounded-md border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
-                    没有匹配的信息
-                  </div>
-                )}
-              </div>
-            </section>
-          )}
-
-          {activeView === "机会池" && (
-            <section className="rounded-md border border-zinc-200 bg-white p-5">
-              <h2 className="text-xl font-semibold">增长机会池</h2>
-              <p className="mt-1 text-sm text-zinc-500">机会 {intelligence.opportunities.length} · 验证中 {validatingOpportunityCount} · 待评估 {waitingOpportunityCount}</p>
-              <div className="mt-5 grid gap-4">
-                {intelligence.opportunities.map((opportunity) => (
-                  <article key={opportunity.id} className="rounded-md border border-zinc-200 p-4">
-                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap gap-2">
-                          <Badge className={maturityStyles[inferOpportunityMaturity(opportunity)]}>{inferOpportunityMaturity(opportunity)}</Badge>
-                          <Badge className="border-cyan-200 bg-cyan-50 text-cyan-700">{opportunity.type}</Badge>
-                          <Badge className="border-amber-200 bg-amber-50 text-amber-800">{opportunity.feasibility}</Badge>
-                          <Badge className="border-zinc-200 bg-zinc-50 text-zinc-700">{opportunity.status}</Badge>
-                        </div>
-                        <h3 className="mt-3 text-lg font-semibold">{opportunity.title}</h3>
-                        <p className="mt-2 text-sm leading-6 text-zinc-600">{opportunity.nextStep}</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {opportunity.actions.map((action) => (
-                            <span key={action} className="rounded bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
-                              {action}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="grid min-w-64 gap-2 rounded-md bg-zinc-50 p-3 text-sm">
-                        <p><span className="font-semibold">推荐周期：</span>{opportunity.cycle}</p>
-                        <p><span className="font-semibold">负责人：</span>{opportunity.owner}</p>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {activeView === "信源维护" && (
+          {activeView === "政策风险" && (
             <div className="grid gap-5">
-              <section className="rounded-md border border-zinc-200 bg-white p-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold">信源维护</h2>
-                    <p className="mt-1 text-sm leading-6 text-zinc-500">
-                      查看当前自动抓取信源，并在本机维护新增或批量导入的候选信源。导出后可合并回仓库配置。
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => downloadSourceFile("json")}
-                      className="h-9 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-600 hover:text-zinc-950"
-                    >
-                      导出 JSON
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => downloadSourceFile("csv")}
-                      className="h-9 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-600 hover:text-zinc-950"
-                    >
-                      导出 CSV
-                    </button>
-                    <button
-                      type="button"
-                      onClick={resetManagedSources}
-                      className="h-9 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-600 hover:text-zinc-950"
-                    >
-                      恢复当前配置
-                    </button>
-                  </div>
+              <section className="bg-white px-5 py-5">
+                <SectionHeader
+                  eyebrow="Policy Risk"
+                  title="政策风险"
+                  summary="只保留与 VPN 技术、隐私、年龄验证、平台访问限制直接相关的政策信息。重复报道会被合并，优先采用政府、监管机构或官方组织来源。"
+                  right={<Badge className="border-rose-200 bg-rose-50 text-rose-700">官方政策信源 {officialPolicySources}</Badge>}
+                />
+                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                  <Metric label="去重后风险" value={policyItems.length} />
+                  <Metric label="官方来源" value={officialPolicySources} />
+                  <Metric label="今日排期" value={managedSources.filter((source) => inferSourcePanel(source) === "政策风险" && shouldCrawlToday(source)).length} />
                 </div>
-
-                <div className="mt-5 grid gap-3 md:grid-cols-4">
-                  {[
-                    ["当前信源", managedSources.length],
-                    ["核心信源", coreManagedSourceCount],
-                    ["本机新增", customSourceCount],
-                    ["市场范围", sourceRules.marketFocus.join(" / ")],
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
-                      <p className="text-xs font-semibold text-zinc-500">{label}</p>
-                      <p className="mt-1 break-words text-xl font-semibold">{value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {sourceImportMessage && (
-                  <p className="mt-4 rounded-md bg-teal-50 p-3 text-sm font-semibold text-teal-800">{sourceImportMessage}</p>
-                )}
               </section>
 
-              <section className="rounded-md border border-zinc-200 bg-white p-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold">全部信源</h2>
-                    <p className="mt-1 text-sm text-zinc-500">展示名称、连接、抓取方式、频率、市场、竞品和场景</p>
+              <section className="grid gap-3">
+                {policyItems.map((item) => <EvidenceCard key={item.id} item={item} />)}
+                {policyItems.length === 0 && <div className="rounded-md border border-zinc-200 bg-white p-6 text-sm text-zinc-500">暂无新的政策风险。</div>}
+              </section>
+            </div>
+          )}
+
+          {activeView === "历史信息库" && (
+            <div className="grid gap-5">
+              <section className="bg-white px-5 py-5">
+                <SectionHeader
+                  eyebrow="History"
+                  title="历史信息库"
+                  summary="查询每天抓取到的信息，适合回溯来源、主题和判断依据。"
+                  right={<Badge className="border-zinc-200 bg-zinc-50 text-zinc-600">当前保留 {intelligence.evidence.length} 条</Badge>}
+                />
+                <div className="mt-5 grid gap-3 md:grid-cols-[1fr_220px]">
+                  <input
+                    value={historyQuery}
+                    onChange={(event) => setHistoryQuery(event.target.value)}
+                    className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none focus:border-teal-500"
+                    placeholder="搜索标题、摘要、来源"
+                  />
+                  <select
+                    value={historyCategory}
+                    onChange={(event) => setHistoryCategory(event.target.value)}
+                    className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none focus:border-teal-500"
+                  >
+                    {["全部", ...sourceCategories].map((category) => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </div>
+              </section>
+
+              <section className="grid gap-3">
+                {historyItems.map((item) => <EvidenceCard key={item.id} item={item} compact />)}
+                {historyItems.length === 0 && <div className="rounded-md border border-zinc-200 bg-white p-6 text-sm text-zinc-500">没有匹配的信息。</div>}
+              </section>
+            </div>
+          )}
+
+          {activeView === "潜在机会" && (
+            <div className="grid gap-5">
+              <section className="bg-white px-5 py-5">
+                <SectionHeader
+                  eyebrow="Opportunity"
+                  title="潜在机会"
+                  summary="只收敛多信源认证后的聚合信息。这里保留简单的人工评级和行动备注，不再暴露复杂字段。"
+                  right={<Badge className="border-teal-200 bg-teal-50 text-teal-700">候选机会 {opportunityItems.length}</Badge>}
+                />
+              </section>
+
+              <section className="grid gap-4">
+                {opportunityItems.map((opportunity) => {
+                  const edit = opportunityEdits[opportunity.id] ?? {
+                    rating: opportunity.type === "短期机会" ? "高" : "中",
+                    status: opportunity.status,
+                    note: opportunity.nextStep,
+                  };
+                  const theme = intelligence.themes.find((item) => item.id === opportunity.themeId);
+                  return (
+                    <article key={opportunity.id} className="rounded-md border border-zinc-200 bg-white p-5">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap gap-2">
+                            <Badge className={priorityStyles[edit.rating]}>{edit.rating}</Badge>
+                            <Badge className="border-zinc-200 bg-zinc-50 text-zinc-600">{edit.status}</Badge>
+                            <Badge className="border-teal-200 bg-teal-50 text-teal-700">{opportunity.feasibility}</Badge>
+                          </div>
+                          <h3 className="mt-3 text-lg font-semibold">{opportunity.title}</h3>
+                          <p className="mt-2 text-sm leading-6 text-zinc-600">{theme?.summary ?? opportunity.cycle}</p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {opportunity.actions.map((action) => (
+                              <Badge key={action} className="border-zinc-200 bg-white text-zinc-600">{action}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="grid min-w-72 gap-3">
+                          <label className="grid gap-2">
+                            <span className="text-xs font-semibold text-zinc-500">人工评级</span>
+                            <select
+                              value={edit.rating}
+                              onChange={(event) => updateOpportunity(opportunity.id, { rating: event.target.value as Priority }, opportunity)}
+                              className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
+                            >
+                              {(["高", "中", "低"] as Priority[]).map((rating) => (
+                                <option key={rating} value={rating}>{rating}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="grid gap-2">
+                            <span className="text-xs font-semibold text-zinc-500">行动备注</span>
+                            <textarea
+                              value={edit.note}
+                              onChange={(event) => updateOpportunity(opportunity.id, { note: event.target.value }, opportunity)}
+                              className="min-h-20 rounded-md border border-zinc-200 px-3 py-2 text-sm leading-5 outline-none focus:border-teal-500"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </section>
+            </div>
+          )}
+
+          {activeView === "信息源管理" && (
+            <div className="grid gap-5">
+              <section className="bg-white px-5 py-5">
+                <SectionHeader
+                  eyebrow="Sources"
+                  title="信息源管理"
+                  summary="维护自动抓取信源，查看每个信源的分类、抓取方式、频率和状态。"
+                  right={
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={exportSources} className="h-9 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-600 hover:text-zinc-950">
+                        导出 JSON
+                      </button>
+                      <button type="button" onClick={resetSources} className="h-9 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-600 hover:text-zinc-950">
+                        恢复正式信源
+                      </button>
+                    </div>
+                  }
+                />
+                <div className="mt-5 grid gap-3 md:grid-cols-4">
+                  <Metric label="全部信源" value={managedSources.length} />
+                  <Metric label="启用信源" value={activeSourceCount} />
+                  <Metric label="今日排期" value={todayScheduledSources} />
+                  <Metric label="抓取异常" value={intelligence.status.sourcesWaitingReview} />
+                </div>
+                {sourceNotice && <p className="mt-4 rounded-md bg-teal-50 p-3 text-sm font-semibold text-teal-800">{sourceNotice}</p>}
+              </section>
+
+              <section className="grid gap-5 xl:grid-cols-[0.8fr_1.2fr]">
+                <div className="rounded-md border border-zinc-200 bg-white p-5">
+                  <h3 className="font-semibold">添加或更新信源</h3>
+                  <div className="mt-4 grid gap-3">
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">信源名称</span>
+                      <input value={sourceForm.name} onChange={(event) => updateSourceForm("name", event.target.value)} className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500" />
+                    </label>
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold text-zinc-500">链接</span>
+                      <input value={sourceForm.url} onChange={(event) => updateSourceForm("url", event.target.value)} className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500" />
+                    </label>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="grid gap-2">
+                        <span className="text-xs font-semibold text-zinc-500">分类</span>
+                        <select value={sourceForm.category} onChange={(event) => updateSourceForm("category", event.target.value)} className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500">
+                          {sourceCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+                        </select>
+                      </label>
+                      <label className="grid gap-2">
+                        <span className="text-xs font-semibold text-zinc-500">二级分类</span>
+                        <input value={sourceForm.secondaryCategory} onChange={(event) => updateSourceForm("secondaryCategory", event.target.value)} className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500" />
+                      </label>
+                      <label className="grid gap-2">
+                        <span className="text-xs font-semibold text-zinc-500">抓取方式</span>
+                        <select value={sourceForm.crawlMethod} onChange={(event) => updateSourceForm("crawlMethod", event.target.value)} className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500">
+                          {sourceCrawlMethods.map((method) => <option key={method} value={method}>{sourceCrawlMethodLabel(method)}</option>)}
+                        </select>
+                      </label>
+                      <label className="grid gap-2">
+                        <span className="text-xs font-semibold text-zinc-500">频率</span>
+                        <select value={sourceForm.frequency} onChange={(event) => updateSourceForm("frequency", event.target.value)} className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500">
+                          {sourceFrequencies.map((frequency) => <option key={frequency} value={frequency}>{sourceFrequencyLabel(frequency)}</option>)}
+                        </select>
+                      </label>
+                      <label className="grid gap-2">
+                        <span className="text-xs font-semibold text-zinc-500">市场</span>
+                        <input value={sourceForm.market} onChange={(event) => updateSourceForm("market", event.target.value)} className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500" />
+                      </label>
+                      <label className="grid gap-2">
+                        <span className="text-xs font-semibold text-zinc-500">竞品/对象</span>
+                        <input value={sourceForm.competitor} onChange={(event) => updateSourceForm("competitor", event.target.value)} className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500" />
+                      </label>
+                    </div>
+                    <button type="button" onClick={saveSource} className="h-10 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white">
+                      保存信源
+                    </button>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-[1fr_180px] lg:min-w-[520px]">
+                </div>
+
+                <div className="rounded-md border border-zinc-200 bg-white p-5">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <h3 className="font-semibold">信源状态</h3>
                     <input
                       value={sourceQuery}
                       onChange={(event) => setSourceQuery(event.target.value)}
-                      className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500"
-                      placeholder="搜索名称、URL、市场、竞品或场景"
+                      className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500 md:w-80"
+                      placeholder="搜索名称、链接、分类"
                     />
-                    <select
-                      value={sourceCategoryFilter}
-                      onChange={(event) => setSourceCategoryFilter(event.target.value)}
-                      className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500"
-                    >
-                      {["全部", ...managedSourceCategories].map((category) => (
-                        <option key={category} value={category}>{category}</option>
-                      ))}
-                    </select>
                   </div>
-                </div>
-
-                <div className="mt-5 overflow-x-auto rounded-md border border-zinc-200">
-                  <div className="grid min-w-[1280px] grid-cols-[1.2fr_0.95fr_1.6fr_0.7fr_0.6fr_0.55fr_0.8fr_0.7fr_0.65fr] bg-zinc-50 px-4 py-3 text-xs font-semibold text-zinc-500">
-                    <span>信源名称</span>
-                    <span>分类</span>
-                    <span>连接</span>
-                    <span>抓取方式</span>
-                    <span>频率</span>
-                    <span>市场</span>
-                    <span>竞品/场景</span>
-                    <span>状态</span>
-                    <span>操作</span>
-                  </div>
-                  {filteredManagedSources.map((source) => (
-                    <div
-                      key={source.id}
-                      className="grid min-w-[1280px] grid-cols-[1.2fr_0.95fr_1.6fr_0.7fr_0.6fr_0.55fr_0.8fr_0.7fr_0.65fr] gap-3 border-t border-zinc-200 px-4 py-4 text-sm"
-                    >
-                      <div>
-                        <p className="break-words font-semibold">{source.name}</p>
-                        <p className="mt-1 break-words text-xs text-zinc-500">{source.id}</p>
-                      </div>
-                      <div className="grid gap-1">
-                        <span>{source.category}</span>
-                        <span className="text-xs text-zinc-500">{source.secondaryCategory || "未设置二级分类"}</span>
-                      </div>
-                      <p className="break-all text-xs leading-5 text-zinc-600">{source.url}</p>
-                      <div className="grid gap-1">
+                  <div className="mt-4 overflow-x-auto rounded-md border border-zinc-200">
+                    <div className="grid min-w-[980px] grid-cols-[1.2fr_0.9fr_1.4fr_0.7fr_0.7fr_0.6fr] bg-zinc-50 px-4 py-3 text-xs font-semibold text-zinc-500">
+                      <span>名称</span>
+                      <span>分类</span>
+                      <span>链接</span>
+                      <span>方式</span>
+                      <span>频率</span>
+                      <span>操作</span>
+                    </div>
+                    {filteredSources.slice(0, 140).map((source) => (
+                      <div key={source.id} className="grid min-w-[980px] grid-cols-[1.2fr_0.9fr_1.4fr_0.7fr_0.7fr_0.6fr] gap-3 border-t border-zinc-200 px-4 py-4 text-sm">
+                        <div>
+                          <p className="font-semibold">{source.name}</p>
+                          <p className="mt-1 text-xs text-zinc-500">{source.market || "Global"}</p>
+                        </div>
+                        <div>
+                          <p>{sourceCategoryLabel(source.category)}</p>
+                          <p className="mt-1 text-xs text-zinc-500">{source.secondaryCategory || "-"}</p>
+                        </div>
+                        <p className="break-all text-xs leading-5 text-zinc-600">{source.url}</p>
                         <span>{sourceCrawlMethodLabel(source.crawlMethod)}</span>
-                        <span className="text-xs text-zinc-500">{source.mode}</span>
-                      </div>
-                      <span>{sourceFrequencyLabel(source.frequency)}</span>
-                      <span>{source.market || "-"}</span>
-                      <div className="grid gap-1">
-                        <span>{source.competitor || "-"}</span>
-                        <span className="text-xs text-zinc-500">{source.scene || "-"}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge className={source.isCore ? "border-teal-200 bg-teal-50 text-teal-700" : "border-zinc-200 bg-white text-zinc-600"}>
-                          {source.isCore ? "核心" : "参考"}
-                        </Badge>
-                        <Badge className={baseSourceIds.has(source.id) ? "border-zinc-200 bg-zinc-50 text-zinc-600" : "border-amber-200 bg-amber-50 text-amber-800"}>
-                          {baseSourceIds.has(source.id) ? "当前配置" : "本机新增"}
-                        </Badge>
-                      </div>
-                      <div className="flex flex-wrap items-start gap-2">
-                        <button
-                          type="button"
-                          onClick={() => editSource(source)}
-                          className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-semibold text-zinc-600 hover:text-zinc-950"
-                        >
+                        <span>{sourceFrequencyLabel(source.frequency)}</span>
+                        <button type="button" onClick={() => editSource(source)} className="h-8 rounded-md border border-zinc-200 px-2 text-xs font-semibold text-zinc-600 hover:text-zinc-950">
                           编辑
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => removeSource(source)}
-                          className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-semibold text-zinc-600 hover:text-zinc-950"
-                        >
-                          移除
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  {filteredManagedSources.length === 0 && (
-                    <div className="p-8 text-center text-sm text-zinc-500">没有匹配的信源</div>
-                  )}
-                </div>
-              </section>
-
-              <section className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
-                <div className="rounded-md border border-zinc-200 bg-white p-5">
-                  <h2 className="text-xl font-semibold">手动添加信源</h2>
-                  <div className="mt-5 grid gap-4 md:grid-cols-2">
-                    <label className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">信源名称</span>
-                      <input
-                        value={sourceForm.name}
-                        onChange={(event) => updateSourceForm("name", event.target.value)}
-                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
-                        placeholder="例如 NordVPN Blog"
-                      />
-                    </label>
-                    <label className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">连接</span>
-                      <input
-                        value={sourceForm.url}
-                        onChange={(event) => updateSourceForm("url", event.target.value)}
-                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
-                        placeholder="https://..."
-                      />
-                    </label>
-                    <label className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">一级分类</span>
-                      <select
-                        value={sourceForm.category}
-                        onChange={(event) => updateSourceForm("category", event.target.value)}
-                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
-                      >
-                        {sourceCategories.map((category) => (
-                          <option key={category} value={category}>{category}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">二级分类</span>
-                      <input
-                        value={sourceForm.secondaryCategory}
-                        onChange={(event) => updateSourceForm("secondaryCategory", event.target.value)}
-                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
-                        placeholder="官网 / 官方账号 / 论坛 / SERP"
-                      />
-                    </label>
-                    <label className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">抓取方式</span>
-                      <select
-                        value={sourceForm.crawlMethod}
-                        onChange={(event) => updateSourceForm("crawlMethod", event.target.value)}
-                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
-                      >
-                        {sourceCrawlMethods.map((method) => (
-                          <option key={method} value={method}>{sourceCrawlMethodLabel(method)}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">抓取频率</span>
-                      <select
-                        value={sourceForm.frequency}
-                        onChange={(event) => updateSourceForm("frequency", event.target.value)}
-                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
-                      >
-                        {sourceFrequencies.map((frequency) => (
-                          <option key={frequency} value={frequency}>{sourceFrequencyLabel(frequency)}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">市场</span>
-                      <input
-                        value={sourceForm.market}
-                        onChange={(event) => updateSourceForm("market", event.target.value)}
-                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
-                        placeholder="US / UK / DE / Global"
-                      />
-                    </label>
-                    <label className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">竞品名称</span>
-                      <input
-                        value={sourceForm.competitor}
-                        onChange={(event) => updateSourceForm("competitor", event.target.value)}
-                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
-                        placeholder="NordVPN / ExpressVPN / Surfshark"
-                      />
-                    </label>
-                    <label className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">需求/动作场景</span>
-                      <input
-                        value={sourceForm.scene}
-                        onChange={(event) => updateSourceForm("scene", event.target.value)}
-                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
-                        placeholder="竞品动作 / 访问困难 / 流媒体访问"
-                      />
-                    </label>
-                    <label className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">颗粒度</span>
-                      <input
-                        value={sourceForm.granularity}
-                        onChange={(event) => updateSourceForm("granularity", event.target.value)}
-                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
-                        placeholder="关键词级 / 账号级 / 对象级"
-                      />
-                    </label>
-                    <label className="grid gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">模式</span>
-                      <input
-                        value={sourceForm.mode}
-                        onChange={(event) => updateSourceForm("mode", event.target.value)}
-                        className="h-10 rounded-md border border-zinc-200 px-3 text-sm outline-none focus:border-teal-500"
-                        placeholder="rss / html / api"
-                      />
-                    </label>
-                    <label className="flex items-center gap-2 pt-6 text-sm font-semibold text-zinc-700">
-                      <input
-                        type="checkbox"
-                        checked={sourceForm.isCore}
-                        onChange={(event) => updateSourceForm("isCore", event.target.checked)}
-                        className="h-4 w-4"
-                      />
-                      核心信源
-                    </label>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={submitSourceForm}
-                    className="mt-5 h-10 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white"
-                  >
-                    添加到维护列表
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSourceForm(createEmptySourceRule())}
-                    className="ml-2 mt-5 h-10 rounded-md border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-600 hover:text-zinc-950"
-                  >
-                    清空表单
-                  </button>
-                </div>
-
-                <div className="rounded-md border border-zinc-200 bg-white p-5">
-                  <h2 className="text-xl font-semibold">批量上传</h2>
-                  <p className="mt-1 text-sm leading-6 text-zinc-500">
-                    支持 JSON 数组、包含 sources 的 JSON，或带表头的 CSV/TSV。字段名建议使用 id、name、category、url、crawlMethod、frequency。
-                  </p>
-                  <label className="mt-4 grid gap-2">
-                    <span className="text-xs font-semibold text-zinc-500">上传文件</span>
-                    <input
-                      type="file"
-                      accept=".json,.csv,.tsv,text/csv,application/json"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        if (!file) return;
-                        file.text().then((text) => setBatchInput(text));
-                      }}
-                      className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
-                    />
-                  </label>
-                  <label className="mt-4 grid gap-2">
-                    <span className="text-xs font-semibold text-zinc-500">批量内容</span>
-                    <textarea
-                      value={batchInput}
-                      onChange={(event) => setBatchInput(event.target.value)}
-                      rows={12}
-                      className="min-h-64 resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 font-mono text-xs leading-5 outline-none transition focus:border-teal-500"
-                      placeholder={"name,category,url,crawlMethod,frequency\nNordVPN Blog,竞品情报,https://nordvpn.com/blog/,RSS,daily"}
-                    />
-                  </label>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={importSourceBatch}
-                      className="h-10 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white"
-                    >
-                      导入到维护列表
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setBatchInput(sourcesToCsv(managedSources))}
-                      className="h-10 rounded-md border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-600 hover:text-zinc-950"
-                    >
-                      填入当前 CSV
-                    </button>
-                  </div>
-                </div>
-              </section>
-            </div>
-          )}
-
-          {activeView === "标签体系" && (
-            <div className="grid gap-5">
-              <section className="rounded-md border border-zinc-200 bg-white p-5">
-                <h2 className="text-xl font-semibold">信源标签体系</h2>
-                <p className="mt-1 text-sm leading-6 text-zinc-500">
-                  信息卡上的标签只回答“这条信息从哪里来”，不直接代表优先级、成熟度或机会价值。每条信息最多展示 5 个信源标签。
-                </p>
-                <div className="mt-5 grid gap-4 md:grid-cols-2">
-                  {sourceTagDefinitions.map(([title, body]) => (
-                    <div key={title} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
-                      <p className="text-sm font-semibold">{title}</p>
-                      <p className="mt-2 text-xs leading-5 text-zinc-500">{body}</p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              <section className="grid gap-5 xl:grid-cols-2">
-                <div className="rounded-md border border-zinc-200 bg-white p-5">
-                  <h2 className="text-xl font-semibold">标签示例</h2>
-                  <div className="mt-5 grid gap-4">
-                    {[
-                      ["竞品官方信源", ["竞品情报", "官网/价格页", "Surfshark", "目标:定价页"], "说明这条信息来自竞品自己的可控阵地，适合观察其产品、定价、内容和品牌表达。"],
-                      ["用户论坛声音", ["用户声音", "论坛/社区", "Reddit", "用户:德国", "目标:美国流媒体"], "说明这条信息来自用户主动讨论，适合判断真实需求、限制原因和使用动机。"],
-                      ["搜索信号", ["SEO搜索", "搜索结果", "Google SERP", "目标:BBC iPlayer"], "说明这条信息来自搜索结果或关键词监控，适合观察流量竞争和内容入口。"],
-                    ].map(([title, tags, body]) => (
-                      <div key={title as string} className="rounded-md border border-zinc-200 p-4">
-                        <SourceTagRow tags={tags as string[]} />
-                        <p className="mt-3 text-sm font-semibold">{title}</p>
-                        <p className="mt-2 text-xs leading-5 text-zinc-500">{body}</p>
                       </div>
                     ))}
                   </div>
-                </div>
-
-                <div className="rounded-md border border-zinc-200 bg-white p-5">
-                  <h2 className="text-xl font-semibold">使用原则</h2>
-                  <div className="mt-5 grid gap-3">
-                    {[
-                      ["少量", "同一条信息不堆叠过多标签，优先保留能帮助运营判断来源的字段。"],
-                      ["稳定", "标签不随系统评分频繁变化，避免今天叫机会、明天叫风险。"],
-                      ["可追溯", "标签必须能回到具体信源或信息内容，不能凭主观感觉添加。"],
-                      ["市场拆分", "用户所在市场只描述发声用户；目标地区/平台只描述用户想访问的内容或服务。"],
-                      ["和评级分离", "P0-P3、L0-L5 是判断标签；信源标签只说明来源，不说明好坏。"],
-                    ].map(([title, body]) => (
-                      <div key={title} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
-                        <p className="text-sm font-semibold">{title}</p>
-                        <p className="mt-2 text-xs leading-5 text-zinc-500">{body}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </section>
-            </div>
-          )}
-
-          {activeView === "规则模型" && (
-            <div className="grid gap-5">
-              <section className="rounded-md border border-zinc-200 bg-white p-5">
-                <h2 className="text-xl font-semibold">数据模型与规则</h2>
-                <div className="mt-5 grid gap-4 lg:grid-cols-3">
-                  {[
-                    ["Item 原始信息", "单条 RSS、页面变化、Google Alerts、Reddit 原帖或媒体文章，默认 L0。"],
-                    ["Event 重点事件", "高优先级 L0，例如政策变化、竞品价格变化、服务器扩容或平台规则变化。"],
-                    ["Phenomenon 现象", "多条信息指向同一外部现象，可进入 L1/L2 候选洞察池。"],
-                    ["Insight 洞察", "经过人工评审并有验证方案、负责人和成功指标，进入 L3+。"],
-                    ["Demand Object", "赛事、流媒体、游戏等会触发 VPN 需求的对象化市场。"],
-                    ["Source 信源", "包含分类、颗粒度、国家、竞品、抓取方式、频率和质量状态。"],
-                  ].map(([title, body]) => (
-                    <div key={title} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
-                      <p className="text-sm font-semibold">{title}</p>
-                      <p className="mt-2 text-xs leading-5 text-zinc-500">{body}</p>
-                    </div>
-                  ))}
+                  <p className="mt-3 text-xs text-zinc-500">当前展示前 140 条匹配结果；可以通过搜索快速定位。</p>
                 </div>
               </section>
 
-              <section className="grid gap-5 xl:grid-cols-2">
-                <div className="rounded-md border border-zinc-200 bg-white p-5">
-                  <h2 className="text-xl font-semibold">洞察成熟度 L0-L5</h2>
-                  <div className="mt-5 grid gap-3">
-                    {[
-                      ["L0", "信息", "单条信息，尚未验证，不强行解释用户行为。"],
-                      ["L1", "信号", "多条信息指向同一现象，但解释链还不完整。"],
-                      ["L2", "候选洞察", "具备需求、限制、VPN 相关性、频率和可信来源。"],
-                      ["L3", "有效洞察", "人工评审通过，有验证方案、负责人和成功指标。"],
-                      ["L4", "已验证洞察", "已执行验证并拿到数据反馈。"],
-                      ["L5", "增长洞察", "多次验证有效，可复用为增长方法。"],
-                    ].map(([level, title, body]) => (
-                      <div key={level} className="rounded-md border border-zinc-200 p-4">
-                        <Badge className={maturityStyles[level as MaturityLevel]}>{level}</Badge>
-                        <p className="mt-2 text-sm font-semibold">{title}</p>
-                        <p className="mt-1 text-xs leading-5 text-zinc-500">{body}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-md border border-zinc-200 bg-white p-5">
-                  <h2 className="text-xl font-semibold">信息优先级 P0-P3</h2>
-                  <div className="mt-5 grid gap-3">
-                    {[
-                      ["P0", "重大事件", "需要立即关注，可能影响市场、产品、合规或运营。"],
-                      ["P1", "重要变化", "值得进入每日看板重点展示，但不一定立即行动。"],
-                      ["P2", "常规动态", "有记录价值，但不进入首页重点位。"],
-                      ["P3", "低价值信息", "默认归档或折叠，需人工抽检。"],
-                    ].map(([level, title, body]) => (
-                      <div key={level} className="rounded-md border border-zinc-200 p-4">
-                        <Badge className={displayPriorityStyles[level as DisplayPriority]}>{level}</Badge>
-                        <p className="mt-2 text-sm font-semibold">{title}</p>
-                        <p className="mt-1 text-xs leading-5 text-zinc-500">{body}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </section>
-
-              <section className="rounded-md border border-zinc-200 bg-white p-5">
-                <h2 className="text-xl font-semibold">L1 → L2 评分规则</h2>
-                <div className="mt-5 grid gap-3 md:grid-cols-5">
-                  {["用户需求明确", "限制原因明确", "VPN相关性明确", "热度/频率明显", "来源可信/多源交叉"].map((item) => (
-                    <div key={item} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
-                      <p className="text-sm font-semibold">{item}</p>
-                      <p className="mt-2 text-xs text-zinc-500">0-2 分</p>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-4 text-sm leading-6 text-zinc-600">
-                  0-3 分建议 L0 或低价值 L1；4-7 分建议 L1；8-10 分建议 L2。限制原因或 VPN 相关性为 0 时，不自动升 L2。
-                </p>
-              </section>
-            </div>
-          )}
-
-          {activeView === "反馈配置" && (
-            <div className="grid gap-5">
-              <section className="rounded-md border border-zinc-200 bg-white p-5">
-                <h2 className="text-xl font-semibold">反馈与配置</h2>
-                <div className="mt-5 grid gap-4 lg:grid-cols-[220px_1fr_auto]">
-                  <select
-                    value={feedbackType}
-                    onChange={(event) => setFeedbackType(event.target.value)}
-                    className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500"
-                  >
-                    {["误判", "重复现象", "低价值", "应升优先级", "应降优先级", "信源无效", "应合并到已有 L3+"].map((item) => (
-                      <option key={item} value={item}>{item}</option>
-                    ))}
-                  </select>
-                  <input
-                    value={feedbackNote}
-                    onChange={(event) => setFeedbackNote(event.target.value)}
-                    className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500"
-                    placeholder="记录需要修正的主题、证据或规则"
-                  />
-                  <button
-                    type="button"
-                    onClick={submitFeedback}
-                    className="h-10 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white"
-                  >
-                    记录反馈
-                  </button>
-                </div>
-                <div className="mt-5 grid gap-2">
-                  {feedbackLogs.map((log) => (
-                    <div key={log} className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">{log}</div>
-                  ))}
-                  {feedbackLogs.length === 0 && <p className="text-sm text-zinc-500">暂无反馈记录</p>}
-                </div>
-              </section>
-
-              <section className="rounded-md border border-zinc-200 bg-white p-5">
-                <h2 className="text-xl font-semibold">当前 MVP 配置缺口</h2>
-                <div className="mt-5 grid gap-3 md:grid-cols-2">
-                  {[
-                    ["已覆盖", "每日更新、6类信源框架、中文摘要、原链接展示、主题聚合、人工修正、机会池。"],
-                    ["新补齐", "L0-L5、P0-P3、重点事件池、L2候选洞察、历史筛选、规则模型、反馈记录。"],
-                    ["仍需后端", "多人共享人工反馈、信源启停、操作日志、长期历史序列、真正的搜索引擎排名抓取。"],
-                    ["下一步建议", "为不同平台接入更细的抓取器、多人共享维护和变更审核记录。"],
-                  ].map(([title, body]) => (
-                    <div key={title} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
-                      <p className="text-sm font-semibold">{title}</p>
-                      <p className="mt-2 text-xs leading-5 text-zinc-500">{body}</p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
-          )}
-
-          {activeView === "信源状态" && (
-            <section className="rounded-md border border-zinc-200 bg-white p-5">
-              <h2 className="text-xl font-semibold">信源状态</h2>
-              <p className="mt-1 text-sm text-zinc-500">信源 {totalSourceCount} · 启用 {activeSourceCount} · 今日正常 {intelligence.status.normalSourceRate}%</p>
-              <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {configuredSourceStats.map((source) => (
-                  <article key={source.name} className="rounded-md border border-zinc-200 p-4">
-                    <div className={`h-2 rounded-full ${source.color}`} />
+              <section className="grid gap-3 md:grid-cols-3">
+                {sourceStats.map((stat) => (
+                  <article key={stat.name} className="rounded-md border border-zinc-200 bg-white p-4">
+                    <div className={`h-2 rounded-full ${stat.color}`} />
                     <div className="mt-4 flex items-start justify-between gap-3">
                       <div>
-                        <h3 className="font-semibold">{source.name}</h3>
-                        <p className="mt-1 text-sm text-zinc-500">{source.freq}</p>
+                        <h3 className="font-semibold">{stat.name}</h3>
+                        <p className="mt-1 text-sm text-zinc-500">{stat.freq}</p>
                       </div>
-                      <p className="text-2xl font-semibold">{source.active}</p>
+                      <p className="text-2xl font-semibold">{stat.total}</p>
                     </div>
-                    <div className="mt-4 h-2 rounded-full bg-zinc-100">
-                      <div
-                        className={`h-2 rounded-full ${source.color}`}
-                        style={{ width: `${Math.round((source.active / source.total) * 100)}%` }}
-                      />
-                    </div>
-                    <div className="mt-3 flex items-center justify-between text-xs text-zinc-500">
-                      <span>启用 {source.active}</span>
-                      <span>总计 {source.total}</span>
-                    </div>
+                    <p className="mt-3 text-xs text-zinc-500">启用 {stat.active} · 总计 {stat.total}</p>
                   </article>
                 ))}
-              </div>
-            </section>
+              </section>
+            </div>
           )}
         </section>
       </div>

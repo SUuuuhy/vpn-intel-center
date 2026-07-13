@@ -4,7 +4,16 @@ import { readFile, writeFile } from "node:fs/promises";
 const DATA_PATH = new URL("../data/intelligence.json", import.meta.url);
 const RULES_PATH = new URL("../data/source-rules.json", import.meta.url);
 const MAX_ITEMS_PER_SOURCE = 8;
+const MAX_HISTORY_ITEMS = 180;
 const FETCH_TIMEOUT_MS = 12000;
+const MAX_CONCURRENT_FETCHES = 6;
+const PANEL_LIMITS = {
+  "竞品情报": 140,
+  "用户声音": 100,
+  "增长热点": 120,
+  "政策风险": 30,
+  "历史信息库": 20,
+};
 const dryRun = process.argv.includes("--dry-run");
 const sanitizeOnly = process.argv.includes("--sanitize-only");
 
@@ -19,32 +28,42 @@ const displayDate = new Intl.DateTimeFormat("en-CA", {
 
 const data = JSON.parse(await readFile(DATA_PATH, "utf8"));
 const rules = JSON.parse(await readFile(RULES_PATH, "utf8"));
-const scheduledSources = rules.sources.filter((source) => shouldCrawlSource(source, now));
+const scheduledSources = selectScheduledSources(rules.sources, now);
 
 const existingEvidenceIds = new Set(data.evidence.map((item) => item.id));
 const fetchedEvidence = [];
 const failures = [];
 
 if (!sanitizeOnly) {
-  for (const source of scheduledSources) {
+  const results = await mapWithConcurrency(scheduledSources, MAX_CONCURRENT_FETCHES, async (source) => {
     try {
       const text = await fetchText(source.url);
       const items = source.mode === "rss" ? parseRss(text) : parseHtmlTitle(text, source.url);
-      for (const item of items.slice(0, MAX_ITEMS_PER_SOURCE)) {
-        const classified = classifyItem(item, source, rules.keywords);
-        if (!classified) continue;
-        if (existingEvidenceIds.has(classified.id)) continue;
-        existingEvidenceIds.add(classified.id);
-        fetchedEvidence.push(classified);
-      }
+      return {
+        source,
+        items: items.slice(0, MAX_ITEMS_PER_SOURCE).map((item) => classifyItem(item, source, rules.keywords)).filter(Boolean),
+      };
     } catch (error) {
-      failures.push({ source: source.id, message: error.message });
+      return { source, error };
+    }
+  });
+
+  for (const result of results) {
+    if (result.error) {
+      failures.push({ source: result.source.id, message: result.error.message });
+      continue;
+    }
+    for (const classified of result.items) {
+      if (existingEvidenceIds.has(classified.id)) continue;
+      existingEvidenceIds.add(classified.id);
+      fetchedEvidence.push(classified);
     }
   }
 }
 
-const mergedEvidence = [...fetchedEvidence, ...data.evidence].slice(0, 80);
-const highPriorityToday = fetchedEvidence.filter((item) => item.role === "核心证据").length;
+const dedupedFetchedEvidence = dedupeEvidence(fetchedEvidence);
+const mergedEvidence = dedupeEvidence([...dedupedFetchedEvidence, ...data.evidence]).slice(0, MAX_HISTORY_ITEMS);
+const highPriorityToday = dedupedFetchedEvidence.filter((item) => item.role === "核心证据").length;
 
 if (!sanitizeOnly) {
   data.generatedAt = generatedAt;
@@ -58,7 +77,7 @@ if (!sanitizeOnly) {
 data.sourceStats = buildSourceStats(rules.sources);
 data.evidence = sanitizeEvidenceList(mergedEvidence);
 
-const latestBriefings = fetchedEvidence
+const latestBriefings = dedupedFetchedEvidence
   .filter((item) => item.role === "核心证据")
   .slice(0, 3)
   .map((item, index) => ({
@@ -90,14 +109,101 @@ if (failures.length > 0) {
   console.warn("Some sources failed:", JSON.stringify(failures));
 }
 console.log(
-  `${dryRun ? "Dry run:" : sanitizeOnly ? "Sanitized" : "Updated"} ${fetchedEvidence.length} new evidence items for ${displayDate}. Checked ${scheduledSources.length}/${rules.sources.length} scheduled sources.`,
+  `${dryRun ? "Dry run:" : sanitizeOnly ? "Sanitized" : "Updated"} ${dedupedFetchedEvidence.length} new evidence items for ${displayDate}. Checked ${scheduledSources.length}/${rules.sources.length} scheduled sources.`,
 );
+
+async function mapWithConcurrency(items, limit, task) {
+  const results = [];
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await task(items[index]);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+function selectScheduledSources(sources, date) {
+  const grouped = new Map();
+  for (const source of sources) {
+    if (!shouldCrawlSource(source, date)) continue;
+    const panel = inferSourcePanel(source);
+    const current = grouped.get(panel) ?? [];
+    current.push(source);
+    grouped.set(panel, current);
+  }
+
+  return ["竞品情报", "用户声音", "增长热点", "政策风险", "历史信息库"].flatMap((panel) => {
+    const limit = PANEL_LIMITS[panel] ?? 30;
+    return (grouped.get(panel) ?? [])
+      .sort((a, b) => sourcePriority(b, panel) - sourcePriority(a, panel))
+      .slice(0, limit);
+  });
+}
 
 function shouldCrawlSource(source, date) {
   const frequency = String(source.frequency || "daily").toLowerCase();
   if (frequency === "paused" || frequency === "manual") return false;
+  const panel = inferSourcePanel(source);
+  if (panel === "政策风险") return isOfficialPolicySource(source) && (frequency !== "weekly" || shanghaiWeekday(date) === "Mon");
+  if (panel === "竞品情报" || panel === "用户声音" || panel === "增长热点") return true;
   if (frequency === "weekly") return shanghaiWeekday(date) === "Mon";
   return true;
+}
+
+function inferSourcePanel(source) {
+  const category = normalizeSourceCategory(source.category);
+  const text = `${source.name} ${source.secondaryCategory} ${source.scene} ${source.url}`.toLowerCase();
+  if (category === "政策监管") return "政策风险";
+  if (category === "用户声音") return "用户声音";
+  if (category === "需求触发市场" || /steamdb|steam|game|gaming|电竞|游戏|f1|world cup|espn|netflix|bbc|hulu|disney|stream/.test(text)) return "增长热点";
+  if (category === "竞品情报" || category === "第三方媒体") return "竞品情报";
+  return "历史信息库";
+}
+
+function sourcePriority(source, panel) {
+  const methodScore = source.mode === "rss" ? 4 : source.crawlMethod === "Social" ? 3 : source.crawlMethod === "SERP" ? 2 : 1;
+  const coreScore = source.isCore ? 8 : 0;
+  const officialScore = isOfficialCompetitorSource(source) || isOfficialPolicySource(source) ? 6 : 0;
+  const panelScore = panel === "政策风险" && isOfficialPolicySource(source) ? 10 : 0;
+  return coreScore + officialScore + panelScore + methodScore;
+}
+
+function isOfficialCompetitorSource(source) {
+  const text = `${source.category} ${source.secondaryCategory} ${source.name} ${source.url}`.toLowerCase();
+  return normalizeSourceCategory(source.category) === "竞品情报" && /官方|官网|blog|pricing|youtube|tiktok|instagram|facebook|linkedin|x\.com|twitter/.test(text);
+}
+
+function isOfficialPolicySource(source) {
+  const text = `${source.name} ${source.secondaryCategory} ${source.url}`.toLowerCase();
+  return /政府|监管|官方|标准|guidance|regulator|commission|authority/.test(text) || /\.gov|europa\.eu|ofcom|ftc|ico\.org|cnil|edpb|acma\.gov|oaic\.gov/.test(text);
+}
+
+function dedupeEvidence(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = evidenceDedupKey(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function evidenceDedupKey(item) {
+  const panel = item.sourcePanel || item.sourceType || "unknown";
+  const title = (item.originalTitle || item.title || "")
+    .replace(/[^\u4e00-\u9fffA-Za-z0-9]+/g, " ")
+    .toLowerCase()
+    .split(" ")
+    .filter((part) => part.length > 2)
+    .slice(0, panel === "政策风险" ? 8 : 12)
+    .join(" ");
+  return `${panel}:${title || item.url || item.id}`;
 }
 
 function shanghaiWeekday(date) {
@@ -407,16 +513,14 @@ function googleSearchUrl(query) {
 
 function classifyItem(item, source, keywords) {
   const text = `${item.title} ${item.summary}`.toLowerCase();
-  const score =
-    countMatches(text, keywords.vpn) * 2 +
-    countMatches(text, keywords.competitors) * 2 +
-    countMatches(text, keywords.demand) +
-    countMatches(text, keywords.platforms);
+  const sourcePanel = inferSourcePanel(source);
+  if (sourcePanel === "政策风险" && !isOfficialPolicySource(source)) return null;
 
-  if (score < 2) return null;
+  const relevance = scoreVpnRelevance(text, source, keywords, sourcePanel);
+  if (relevance.score < relevance.minScore) return null;
 
   const themeId = inferThemeId(text, source.category);
-  const role = score >= 4 ? "核心证据" : "参考信息";
+  const role = relevance.score >= relevance.coreScore ? "核心证据" : "参考信息";
   const id = createHash("sha1").update(`${source.id}:${item.link || item.title}`).digest("hex").slice(0, 12);
   const publishedDate = item.publishedAt ? new Date(item.publishedAt) : now;
   const safePublishedDate = Number.isNaN(publishedDate.getTime()) ? now : publishedDate;
@@ -439,11 +543,73 @@ function classifyItem(item, source, keywords) {
     title: buildChineseTitle(rawTitle, source, themeId),
     originalTitle: rawTitle,
     sourceType: source.category,
+    sourcePanel,
+    vpnRelevance: relevance.label,
+    displayPriority: relevance.priority,
     source: source.name,
     summary: buildChineseSummary(rawTitle, rawSummary, source, themeId, role),
     time,
     url: item.link || source.url,
   };
+}
+
+function scoreVpnRelevance(text, source, keywords, panel) {
+  const score =
+    countMatches(text, keywords.vpn) * 2 +
+    countMatches(text, keywords.competitors) * 2 +
+    countMatches(text, keywords.demand) +
+    countMatches(text, keywords.platforms) +
+    sourceBonus(source, panel);
+  const restrictionScore = countMatches(text, ["blocked", "restriction", "geo", "region", "unblock", "access", "payment", "age verification", "blackout", "not available", "地区", "限制", "跨区"]);
+  const discussionScore = countMatches(text, ["reddit", "forum", "community", "thread", "discussion", "用户", "讨论"]);
+
+  if (panel === "增长热点") {
+    const growthScore = score + restrictionScore * 2;
+    return {
+      score: growthScore,
+      minScore: 4,
+      coreScore: 7,
+      label: growthScore >= 7 ? "VPN 强相关" : "待验证相关",
+      priority: growthScore >= 7 ? "P1" : "P2",
+    };
+  }
+
+  if (panel === "用户声音") {
+    const userScore = score + discussionScore + restrictionScore;
+    return {
+      score: userScore,
+      minScore: 3,
+      coreScore: 6,
+      label: userScore >= 6 ? "需求明确" : "需求待确认",
+      priority: userScore >= 6 ? "P1" : "P2",
+    };
+  }
+
+  if (panel === "政策风险") {
+    const policyScore = score + countMatches(text, ["law", "regulation", "policy", "privacy", "security", "vpn", "age verification", "compliance"]) * 2;
+    return {
+      score: policyScore,
+      minScore: 4,
+      coreScore: 7,
+      label: policyScore >= 7 ? "官方高相关" : "官方待观察",
+      priority: policyScore >= 7 ? "P1" : "P2",
+    };
+  }
+
+  return {
+    score,
+    minScore: 2,
+    coreScore: 5,
+    label: score >= 5 ? "竞品强相关" : "竞品待确认",
+    priority: score >= 5 ? "P1" : "P2",
+  };
+}
+
+function sourceBonus(source, panel) {
+  if (panel === "竞品情报" && isOfficialCompetitorSource(source)) return 2;
+  if (panel === "政策风险" && isOfficialPolicySource(source)) return 2;
+  if (source.isCore) return 1;
+  return 0;
 }
 
 function countMatches(text, list) {
