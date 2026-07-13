@@ -825,6 +825,7 @@ function classifyItem(item, source, keywords) {
   const text = `${item.title} ${item.summary}`.toLowerCase();
   const sourcePanel = inferSourcePanel(source);
   if (isGenericHomepageSnapshot(item, source)) return null;
+  if (isStaticCompetitorCandidate(item, source)) return null;
   if (sourcePanel === "政策风险" && !isOfficialPolicySource(source) && !source.collectionProfile) return null;
   if (source.collectionProfile && !profileMatchesItem(item, source)) return null;
   if (source.collectionProfile && !isFreshProfileItem(item)) return null;
@@ -875,6 +876,7 @@ function explainRejectedItem(item, source, keywords) {
   const text = `${item.title} ${item.summary}`.toLowerCase();
   const sourcePanel = inferSourcePanel(source);
   if (isGenericHomepageSnapshot(item, source)) return "静态主页或社媒账号首页，不代表最新动态";
+  if (isStaticCompetitorCandidate(item, source)) return "竞品官网或社媒账号静态入口页，不代表最新动态";
   if (sourcePanel === "政策风险" && !isOfficialPolicySource(source) && !source.collectionProfile) return "政策风险只保留官方或专题任务来源";
   if (source.collectionProfile && !profileMatchesItem(item, source)) return "不符合专题纳入关键词或命中排除词";
   if (source.collectionProfile && !isFreshProfileItem(item)) return "发布时间超出专题时效窗口";
@@ -1006,25 +1008,42 @@ function isLowValueEvidenceSnapshot(item) {
   const sourceText = `${item.sourceType} ${item.source} ${item.url || ""}`.toLowerCase();
   const title = `${item.originalTitle || item.title || ""}`.toLowerCase();
   const isCompetitorStaticSource = /竞品情报|surfshark\.com|expressvpn\.com|protonvpn\.com|privateinternetaccess\.com|nordvpn\.com|cyberghostvpn\.com|ipvanish\.com/.test(sourceText);
-  if (isStaticCompetitorUrl(item.url, item.sourceType)) return true;
+  if (isStaticCompetitorUrl(item.url, item.sourceType, item.source, title)) return true;
   if (!/instagram|tiktok|linkedin|x\.com|twitter|facebook|youtube|官网|official|pricing/.test(sourceText) && !isCompetitorStaticSource) return false;
   if (/expressvpn blog|expressvpn press room|the proton blog|blog: all things|all things digital privacy|the best vpn for speed|fast, secure|mullvad vpn|privacy is a universal right|unlock content with a fast|welcome to the private internet access blog/.test(title)) return true;
   if (/\b(news|press|release|article|announce|announcement|update|launch|report|study|deal)\b|price increase/.test(title)) return false;
   return /instagram|tiktok|linkedin|job search|creative center|\/ x$|youtube|facebook|best vpn service|pricing|official site|home|login|sign up|all-in-one cybersecurity|buy vpn|expressvpn blog|the proton blog|server locations/.test(title);
 }
 
-function isStaticCompetitorUrl(url, sourceType) {
+function isStaticCompetitorCandidate(item, source) {
+  return isStaticCompetitorUrl(item.link || source.url, source.category, source.name, item.title);
+}
+
+function isStaticCompetitorUrl(url, sourceType, sourceName = "", title = "") {
   if (normalizeSourceCategory(sourceType) !== "竞品情报" || !url) return false;
   try {
     const parsed = new URL(url);
     const host = parsed.hostname.replace(/^www\./, "");
     if (/news\.google|google\.com/.test(host)) return false;
-    if (!/nordvpn|surfshark|expressvpn|protonvpn|privateinternetaccess|cyberghostvpn|ipvanish|mullvad|windscribe|tunnelbear|hotspotshield|hide\.me|ivpn|mozilla|purevpn|privatevpn/.test(host)) return false;
     const path = parsed.pathname.replace(/\/+$/, "") || "/";
+    if (isStaticCompetitorSocialProfile(host, path)) return true;
+    const sourceText = `${host} ${sourceName} ${title}`.toLowerCase();
+    if (!/nordvpn|surfshark|expressvpn|protonvpn|privateinternetaccess|cyberghostvpn|ipvanish|mullvad|windscribe|tunnelbear|hotspotshield|hide\.me|ivpn|mozilla|purevpn|privatevpn|vyprvpn|adguard-vpn|adguard vpn|privadovpn|xvpn|x-vpn|atlasvpn|torguard|strongvpn|hidemyass|hma vpn|zenmate|hola vpn|betternet|airvpn|perfect-privacy|astrill|vpnsecure|vpnunlimited|keepsolid|urban-vpn|ultravpn|hideipvpn|goosevpn|fastestvpn/.test(sourceText)) return false;
     return path === "/" || /^\/(order|pricing|price|press|blog|vpn-server|servers?|download|downloads|features?|products\/vpn|pages\/buy-vpn)$/.test(path);
   } catch {
     return false;
   }
+}
+
+function isStaticCompetitorSocialProfile(host, path) {
+  const normalizedPath = path.toLowerCase();
+  const segments = normalizedPath.split("/").filter(Boolean);
+  if (/facebook\.com$|instagram\.com$|x\.com$|twitter\.com$/.test(host)) return segments.length === 1;
+  if (/tiktok\.com$/.test(host)) return segments.length === 1 && normalizedPath.startsWith("/@");
+  if (/youtube\.com$/.test(host)) return /^\/(@[^/]+|c\/[^/]+|user\/[^/]+|channel\/[^/]+)$/.test(normalizedPath);
+  if (/linkedin\.com$/.test(host)) return /^\/company\/[^/]+$/.test(normalizedPath);
+  if (/reddit\.com$/.test(host)) return /^\/(r|user)\/[^/]+$/.test(normalizedPath);
+  return false;
 }
 
 function isGenericHomepageSnapshot(item, source) {

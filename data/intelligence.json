@@ -1833,54 +1833,6 @@
       "url": "https://news.google.com/rss/articles/CBMitgFBVV95cUxQTjNxc0p3QmRnTE93X1Q2OW1iWFplZDd3WWFPeVpLVFAxUDQyYzZCaXF2RFAzWDRiSXRkbGloZkhUN3BrN1dqSEhCNzNYZllOcHF2VW03SW5tZDZVekZmTU5OTVNBWnhrRURVOTBaMUJOSGtqRkRfR056Y3BkRnZZeHprcXJUOWpXQ0FqMURvUDFmMm8tRFNQWWJVY3BhcjVNOXNHUmppdmZXZUFuQWZrLU1FOGZfdw?oc=5"
     },
     {
-      "id": "auto-dafe594f1001",
-      "role": "参考信息",
-      "themeId": "a1",
-      "title": "竞品动作：VPN 市场相关信号",
-      "originalTitle": "The Best VPN Provider for a Private Internet | VyprVPN | VyprVPN",
-      "sourceType": "竞品情报",
-      "source": "VyprVPN",
-      "summary": "该信息来自VyprVPN，显示相关竞品围绕「VPN 市场相关信号」出现产品、内容、价格或品牌动作。系统将其标记为参考信息，用于判断竞品正在把哪些需求场景转化为增长入口。原文标题：The Best VPN Provider for a Private Internet | VyprVPN | VyprVPN。",
-      "time": "2026-07-11 15:20",
-      "url": "https://www.vyprvpn.com/"
-    },
-    {
-      "id": "auto-2e347c818a34",
-      "role": "参考信息",
-      "themeId": "a1",
-      "title": "竞品动作：隐私监管与合规风险",
-      "originalTitle": "AdGuard VPN for your privacy and security",
-      "sourceType": "竞品情报",
-      "source": "AdGuard VPN",
-      "summary": "该信息来自AdGuard VPN，显示相关竞品围绕「隐私监管与合规风险」出现产品、内容、价格或品牌动作。系统将其标记为参考信息，用于判断竞品正在把哪些需求场景转化为增长入口。原文标题：AdGuard VPN for your privacy and security。",
-      "time": "2026-07-11 15:20",
-      "url": "https://adguard-vpn.com/"
-    },
-    {
-      "id": "auto-bc12b1a6bf11",
-      "role": "参考信息",
-      "themeId": "a1",
-      "title": "竞品动作：安全防护功能",
-      "originalTitle": "Best VPN & Online Protection Bundle | PrivadoVPN",
-      "sourceType": "竞品情报",
-      "source": "PrivadoVPN",
-      "summary": "该信息来自PrivadoVPN，显示相关竞品围绕「安全防护功能」出现产品、内容、价格或品牌动作。系统将其标记为参考信息，用于判断竞品正在把哪些需求场景转化为增长入口。原文标题：Best VPN & Online Protection Bundle | PrivadoVPN。",
-      "time": "2026-07-11 15:20",
-      "url": "https://privadovpn.com/"
-    },
-    {
-      "id": "auto-4b3da4192488",
-      "role": "参考信息",
-      "themeId": "a1",
-      "title": "竞品动作：VPN 市场相关信号",
-      "originalTitle": "Free, Secure & Fast VPN Service | X-VPN",
-      "sourceType": "竞品情报",
-      "source": "X-VPN",
-      "summary": "该信息来自X-VPN，显示相关竞品围绕「VPN 市场相关信号」出现产品、内容、价格或品牌动作。系统将其标记为参考信息，用于判断竞品正在把哪些需求场景转化为增长入口。原文标题：Free, Secure & Fast VPN Service | X-VPN。",
-      "time": "2026-07-11 15:20",
-      "url": "https://xvpn.io/"
-    },
-    {
       "id": "auto-ae3f114a554f",
       "role": "参考信息",
       "themeId": "d1",
@@ -1903,30 +1855,6 @@
       "summary": "该信息来自Stack Exchange Super User（Super User），反映外部讨论中出现「BBC iPlayer 访问限制」相关需求。系统将其标记为参考信息，重点用于判断用户想访问什么内容或服务，以及受到地区、支付、隐私或平台规则限制后是否产生 VPN 使用动机。原文标题：Newest 'vpn' Questions。",
       "time": "2026-07-11 15:20",
       "url": "https://superuser.com/questions/tagged/vpn"
-    },
-    {
-      "id": "auto-5b52065daa08",
-      "role": "核心证据",
-      "themeId": "a1",
-      "title": "NordVPN 动作：VPN 市场相关信号",
-      "originalTitle": "NordVPN",
-      "sourceType": "竞品情报",
-      "source": "NordVPN Facebook",
-      "summary": "该信息来自NordVPN Facebook，显示NordVPN围绕「VPN 市场相关信号」出现产品、内容、价格或品牌动作。系统将其标记为核心证据，用于判断竞品正在把哪些需求场景转化为增长入口。原文标题：NordVPN。",
-      "time": "2026-07-11 15:20",
-      "url": "https://www.facebook.com/NordVPN/"
-    },
-    {
-      "id": "auto-d199a289143a",
-      "role": "核心证据",
-      "themeId": "a3",
-      "title": "ExpressVPN 动作：流媒体解锁内容",
-      "originalTitle": "ExpressVPN",
-      "sourceType": "竞品情报",
-      "source": "ExpressVPN Facebook",
-      "summary": "该信息来自ExpressVPN Facebook，显示ExpressVPN围绕「流媒体解锁内容」出现产品、内容、价格或品牌动作。系统将其标记为核心证据，用于判断竞品正在把哪些需求场景转化为增长入口。原文标题：ExpressVPN。",
-      "time": "2026-07-11 15:20",
-      "url": "https://www.facebook.com/ExpressVPN/"
     },
     {
       "id": "auto-c827b5f950f8",
