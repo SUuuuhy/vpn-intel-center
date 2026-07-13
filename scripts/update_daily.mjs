@@ -1006,10 +1006,25 @@ function isLowValueEvidenceSnapshot(item) {
   const sourceText = `${item.sourceType} ${item.source} ${item.url || ""}`.toLowerCase();
   const title = `${item.originalTitle || item.title || ""}`.toLowerCase();
   const isCompetitorStaticSource = /竞品情报|surfshark\.com|expressvpn\.com|protonvpn\.com|privateinternetaccess\.com|nordvpn\.com|cyberghostvpn\.com|ipvanish\.com/.test(sourceText);
+  if (isStaticCompetitorUrl(item.url, item.sourceType)) return true;
   if (!/instagram|tiktok|linkedin|x\.com|twitter|facebook|youtube|官网|official|pricing/.test(sourceText) && !isCompetitorStaticSource) return false;
   if (/expressvpn blog|expressvpn press room|the proton blog|blog: all things|all things digital privacy|the best vpn for speed|fast, secure|mullvad vpn|privacy is a universal right|unlock content with a fast|welcome to the private internet access blog/.test(title)) return true;
   if (/\b(news|press|release|article|announce|announcement|update|launch|report|study|deal)\b|price increase/.test(title)) return false;
   return /instagram|tiktok|linkedin|job search|creative center|\/ x$|youtube|facebook|best vpn service|pricing|official site|home|login|sign up|all-in-one cybersecurity|buy vpn|expressvpn blog|the proton blog|server locations/.test(title);
+}
+
+function isStaticCompetitorUrl(url, sourceType) {
+  if (normalizeSourceCategory(sourceType) !== "竞品情报" || !url) return false;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, "");
+    if (/news\.google|google\.com/.test(host)) return false;
+    if (!/nordvpn|surfshark|expressvpn|protonvpn|privateinternetaccess|cyberghostvpn|ipvanish|mullvad|windscribe|tunnelbear|hotspotshield|hide\.me|ivpn|mozilla|purevpn|privatevpn/.test(host)) return false;
+    const path = parsed.pathname.replace(/\/+$/, "") || "/";
+    return path === "/" || /^\/(order|pricing|price|press|blog|vpn-server|servers?|download|downloads|features?|products\/vpn|pages\/buy-vpn)$/.test(path);
+  } catch {
+    return false;
+  }
 }
 
 function isGenericHomepageSnapshot(item, source) {
