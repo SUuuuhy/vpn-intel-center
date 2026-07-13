@@ -52,7 +52,7 @@ if (!sanitizeOnly) {
       const rawItems =
         source.mode === "rss"
           ? parseRss(text)
-          : source.mode === "html-deep"
+          : source.mode === "html-deep" || shouldDeepScanHtmlSource(source)
             ? await parseHtmlDeep(text, source.url)
             : parseHtmlTitle(text, source.url);
       const itemLimit = source.collectionProfile ? MAX_PROFILE_ITEMS_PER_SOURCE : MAX_ITEMS_PER_SOURCE;
@@ -106,8 +106,8 @@ if (!sanitizeOnly) {
   }
 }
 
-const dedupedFetchedEvidence = dedupeEvidence(fetchedEvidence);
-const mergedEvidence = dedupeEvidence([...dedupedFetchedEvidence, ...data.evidence]).slice(0, MAX_HISTORY_ITEMS);
+const dedupedFetchedEvidence = dedupeEvidence(fetchedEvidence).filter(shouldKeepEvidenceItem);
+const mergedEvidence = dedupeEvidence([...dedupedFetchedEvidence, ...data.evidence]).filter(shouldKeepEvidenceItem).slice(0, MAX_HISTORY_ITEMS);
 const highPriorityToday = dedupedFetchedEvidence.filter((item) => item.role === "核心证据").length;
 
 if (!sanitizeOnly) {
@@ -445,6 +445,13 @@ function normalizeSourceCategory(category) {
   if (category === "政策与监管") return "政策监管";
   if (category === "相关市场" || category === "平台服务生态" || category === "相关平台") return "需求触发市场";
   return category;
+}
+
+function shouldDeepScanHtmlSource(source) {
+  if (source.mode !== "html") return false;
+  if (source.crawlMethod === "Social") return false;
+  const text = `${source.name} ${source.secondaryCategory} ${source.scene} ${source.url}`.toLowerCase();
+  return /blog|news|press|release|article|insight|resource|stories|公告|新闻|博客|资讯/.test(text);
 }
 
 async function fetchText(url) {
@@ -817,6 +824,7 @@ function googleSearchUrl(query) {
 function classifyItem(item, source, keywords) {
   const text = `${item.title} ${item.summary}`.toLowerCase();
   const sourcePanel = inferSourcePanel(source);
+  if (isGenericHomepageSnapshot(item, source)) return null;
   if (sourcePanel === "政策风险" && !isOfficialPolicySource(source) && !source.collectionProfile) return null;
   if (source.collectionProfile && !profileMatchesItem(item, source)) return null;
   if (source.collectionProfile && !isFreshProfileItem(item)) return null;
@@ -866,6 +874,7 @@ function classifyItem(item, source, keywords) {
 function explainRejectedItem(item, source, keywords) {
   const text = `${item.title} ${item.summary}`.toLowerCase();
   const sourcePanel = inferSourcePanel(source);
+  if (isGenericHomepageSnapshot(item, source)) return "静态主页或社媒账号首页，不代表最新动态";
   if (sourcePanel === "政策风险" && !isOfficialPolicySource(source) && !source.collectionProfile) return "政策风险只保留官方或专题任务来源";
   if (source.collectionProfile && !profileMatchesItem(item, source)) return "不符合专题纳入关键词或命中排除词";
   if (source.collectionProfile && !isFreshProfileItem(item)) return "发布时间超出专题时效窗口";
@@ -986,4 +995,38 @@ function inferThemeId(text, category) {
   if (text.includes("payment") || text.includes("hulu") || text.includes("disney")) return "d2";
   if (text.includes("privacy") || text.includes("age verification") || text.includes("age-verification") || text.includes("verification")) return "d3";
   return "d1";
+}
+
+function shouldKeepEvidenceItem(item) {
+  if (!String(item.id || "").startsWith("auto-")) return true;
+  return !isLowValueEvidenceSnapshot(item);
+}
+
+function isLowValueEvidenceSnapshot(item) {
+  const sourceText = `${item.sourceType} ${item.source} ${item.url || ""}`.toLowerCase();
+  const title = `${item.originalTitle || item.title || ""}`.toLowerCase();
+  if (!/instagram|tiktok|linkedin|x\.com|twitter|facebook|youtube|官网|official|pricing/.test(sourceText)) return false;
+  if (/news|blog|press|release|article|announc|update|launch|report|study|deal|price increase/.test(title)) return false;
+  return /instagram|tiktok|linkedin|job search|creative center|\/ x$|youtube|facebook|best vpn service|pricing|official site|home|login|sign up/.test(title);
+}
+
+function isGenericHomepageSnapshot(item, source) {
+  if (source.collectionProfile || source.mode === "rss" || source.mode === "html-deep") return false;
+  const link = normalizeComparableUrl(item.link || source.url);
+  const sourceUrl = normalizeComparableUrl(source.url);
+  const sourceText = `${source.category} ${source.name} ${source.secondaryCategory} ${source.crawlMethod} ${source.url}`.toLowerCase();
+  if (source.crawlMethod === "Social" && link === sourceUrl) return true;
+  if (normalizeSourceCategory(source.category) === "竞品情报" && source.mode === "html" && link === sourceUrl && !shouldDeepScanHtmlSource(source)) return true;
+  return /instagram|tiktok|linkedin|x\.com|twitter|facebook|youtube/.test(sourceText) && link === sourceUrl;
+}
+
+function normalizeComparableUrl(url) {
+  try {
+    const parsed = new URL(url);
+    parsed.hash = "";
+    parsed.search = "";
+    return parsed.href.replace(/\/$/, "");
+  } catch {
+    return String(url || "").replace(/[?#].*$/, "").replace(/\/$/, "");
+  }
 }
