@@ -1005,9 +1005,11 @@ function shouldKeepEvidenceItem(item) {
 function isLowValueEvidenceSnapshot(item) {
   const sourceText = `${item.sourceType} ${item.source} ${item.url || ""}`.toLowerCase();
   const title = `${item.originalTitle || item.title || ""}`.toLowerCase();
-  if (!/instagram|tiktok|linkedin|x\.com|twitter|facebook|youtube|官网|official|pricing/.test(sourceText)) return false;
+  const isCompetitorStaticSource = /竞品情报|surfshark\.com|expressvpn\.com|protonvpn\.com|privateinternetaccess\.com|nordvpn\.com|cyberghostvpn\.com|ipvanish\.com/.test(sourceText);
+  if (!/instagram|tiktok|linkedin|x\.com|twitter|facebook|youtube|官网|official|pricing/.test(sourceText) && !isCompetitorStaticSource) return false;
+  if (/expressvpn blog|the proton blog|blog: all things|all things digital privacy/.test(title)) return true;
   if (/news|blog|press|release|article|announc|update|launch|report|study|deal|price increase/.test(title)) return false;
-  return /instagram|tiktok|linkedin|job search|creative center|\/ x$|youtube|facebook|best vpn service|pricing|official site|home|login|sign up/.test(title);
+  return /instagram|tiktok|linkedin|job search|creative center|\/ x$|youtube|facebook|best vpn service|pricing|official site|home|login|sign up|all-in-one cybersecurity|buy vpn|expressvpn blog|the proton blog|server locations/.test(title);
 }
 
 function isGenericHomepageSnapshot(item, source) {
