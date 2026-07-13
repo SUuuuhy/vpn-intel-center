@@ -5,9 +5,12 @@ const DATA_PATH = new URL("../data/intelligence.json", import.meta.url);
 const RULES_PATH = new URL("../data/source-rules.json", import.meta.url);
 const PROFILES_PATH = new URL("../data/collection-profiles.json", import.meta.url);
 const MAX_ITEMS_PER_SOURCE = 8;
-const MAX_PROFILE_ANCHORS = 18;
+const MAX_PROFILE_ITEMS_PER_SOURCE = 40;
+const MAX_PROFILE_ANCHORS = 40;
 const MAX_HISTORY_ITEMS = 180;
+const MAX_DIAGNOSTIC_RECORDS = 160;
 const FETCH_TIMEOUT_MS = 12000;
+const FETCH_RETRY_COUNT = 3;
 const MAX_CONCURRENT_FETCHES = 6;
 const PANEL_LIMITS = {
   "竞品情报": 140,
@@ -39,27 +42,58 @@ const scheduledSources = selectScheduledSources(profilesOnly ? profileSources : 
 const existingEvidenceIds = new Set(data.evidence.map((item) => item.id));
 const fetchedEvidence = [];
 const failures = [];
+const crawlDiagnosticRecords = [];
 
 if (!sanitizeOnly) {
   const results = await mapWithConcurrency(scheduledSources, MAX_CONCURRENT_FETCHES, async (source) => {
+    const checkedAt = new Date().toISOString();
     try {
       const text = await fetchText(source.url);
-      const items =
+      const rawItems =
         source.mode === "rss"
           ? parseRss(text)
           : source.mode === "html-deep"
             ? await parseHtmlDeep(text, source.url)
             : parseHtmlTitle(text, source.url);
+      const itemLimit = source.collectionProfile ? MAX_PROFILE_ITEMS_PER_SOURCE : MAX_ITEMS_PER_SOURCE;
+      const candidateItems = rawItems.slice(0, itemLimit);
+      const acceptedItems = [];
+      const rejectedSamples = [];
+
+      for (const item of candidateItems) {
+        const classified = classifyItem(item, source, rules.keywords);
+        if (classified) {
+          acceptedItems.push(classified);
+        } else if (rejectedSamples.length < 4) {
+          rejectedSamples.push({
+            title: cleanSummary(item.title, item.link || source.url).slice(0, 140),
+            reason: explainRejectedItem(item, source, rules.keywords),
+          });
+        }
+      }
+
       return {
         source,
-        items: items.slice(0, MAX_ITEMS_PER_SOURCE).map((item) => classifyItem(item, source, rules.keywords)).filter(Boolean),
+        items: acceptedItems,
+        diagnostic: buildSourceDiagnostic(source, {
+          checkedAt,
+          rawItems,
+          candidateItems,
+          acceptedItems,
+          rejectedSamples,
+        }),
       };
     } catch (error) {
-      return { source, error };
+      return {
+        source,
+        error,
+        diagnostic: buildFailureDiagnostic(source, error, checkedAt),
+      };
     }
   });
 
   for (const result of results) {
+    if (result.diagnostic) crawlDiagnosticRecords.push(result.diagnostic);
     if (result.error) {
       failures.push({ source: result.source.id, message: result.error.message });
       continue;
@@ -79,11 +113,12 @@ const highPriorityToday = dedupedFetchedEvidence.filter((item) => item.role === 
 if (!sanitizeOnly) {
   data.generatedAt = generatedAt;
   data.displayDate = displayDate;
-  data.status.newItemsToday = fetchedEvidence.length;
+  data.status.newItemsToday = dedupedFetchedEvidence.length;
   data.status.highPriorityToday = highPriorityToday;
-  data.status.pendingReview = Math.max(data.status.pendingReview, failures.length);
+  data.status.pendingReview = failures.length + crawlDiagnosticRecords.filter((record) => record.status === "候选未入库").length;
   data.status.normalSourceRate = Math.round(((scheduledSources.length - failures.length) / Math.max(1, scheduledSources.length)) * 100);
   data.status.sourcesWaitingReview = failures.length;
+  data.crawlDiagnostics = buildCrawlDiagnostics(crawlDiagnosticRecords, scheduledSources.length);
 }
 data.sourceStats = buildSourceStats(rules.sources);
 data.evidence = sanitizeEvidenceList(mergedEvidence);
@@ -122,6 +157,8 @@ if (failures.length > 0) {
 console.log(
   `${dryRun ? "Dry run:" : sanitizeOnly ? "Sanitized" : "Updated"} ${dedupedFetchedEvidence.length} new evidence items for ${displayDate}. Checked ${scheduledSources.length}/${profilesOnly ? profileSources.length : allSources.length} scheduled sources.`,
 );
+
+process.exit(0);
 
 function buildProfileSources(profiles) {
   return profiles.flatMap((profile) => {
@@ -243,6 +280,94 @@ function sourcePriority(source, panel) {
   return coreScore + officialScore + panelScore + profileScore + methodScore;
 }
 
+function buildCrawlDiagnostics(records, checkedSources) {
+  const acceptedItems = records.reduce((sum, record) => sum + record.acceptedCount, 0);
+  const candidateItems = records.reduce((sum, record) => sum + record.candidateCount, 0);
+  const failedSources = records.filter((record) => record.status === "抓取失败").length;
+  const filteredItems = records.reduce((sum, record) => sum + record.rejectedCount, 0);
+
+  return {
+    generatedAt,
+    checkedSources,
+    candidateItems,
+    acceptedItems,
+    failedSources,
+    filteredItems,
+    records: records
+      .sort((a, b) => diagnosticStatusWeight(a.status) - diagnosticStatusWeight(b.status))
+      .slice(0, MAX_DIAGNOSTIC_RECORDS),
+  };
+}
+
+function diagnosticStatusWeight(status) {
+  if (status === "抓取失败") return 0;
+  if (status === "候选未入库") return 1;
+  if (status === "无候选") return 2;
+  return 3;
+}
+
+function buildSourceDiagnostic(source, { checkedAt, rawItems, candidateItems, acceptedItems, rejectedSamples }) {
+  const candidateCount = candidateItems.length;
+  const acceptedCount = acceptedItems.length;
+  const status = acceptedCount > 0 ? "入库" : candidateCount > 0 ? "候选未入库" : "无候选";
+
+  return {
+    id: source.id,
+    name: source.name,
+    panel: inferSourcePanel(source),
+    category: normalizeSourceCategory(source.category),
+    method: source.mode || source.crawlMethod,
+    url: source.url,
+    status,
+    checkedAt,
+    candidateCount,
+    rawCandidateCount: rawItems.length,
+    acceptedCount,
+    rejectedCount: Math.max(0, candidateCount - acceptedCount),
+    collectionProfileName: source.collectionProfileName || "",
+    collectionKeyword: source.collectionKeyword || "",
+    acceptedSamples: acceptedItems.slice(0, 3).map((item) => item.title),
+    rejectedSamples,
+    note: diagnosticNote(status, source),
+  };
+}
+
+function buildFailureDiagnostic(source, error, checkedAt) {
+  return {
+    id: source.id,
+    name: source.name,
+    panel: inferSourcePanel(source),
+    category: normalizeSourceCategory(source.category),
+    method: source.mode || source.crawlMethod,
+    url: source.url,
+    status: "抓取失败",
+    checkedAt,
+    candidateCount: 0,
+    rawCandidateCount: 0,
+    acceptedCount: 0,
+    rejectedCount: 0,
+    collectionProfileName: source.collectionProfileName || "",
+    collectionKeyword: source.collectionKeyword || "",
+    acceptedSamples: [],
+    rejectedSamples: [],
+    failureReason: error.message,
+    note: diagnosticNote("抓取失败", source, error.message),
+  };
+}
+
+function diagnosticNote(status, source, reason = "") {
+  if (status === "抓取失败") {
+    if (/403|401|forbidden/i.test(reason)) return "站点限制普通抓取，需要浏览器渲染、官方 RSS/API 或专门适配。";
+    if (/abort|timeout|fetch failed/i.test(reason)) return "网络或 TLS 失败，已自动重试；后续可用浏览器任务补扫。";
+    return "抓取请求失败，建议检查信源可用性或改为搜索/RSS 回退。";
+  }
+  if (status === "候选未入库") return "抓到了候选，但没有通过主题、时效或相关性规则。";
+  if (status === "无候选") {
+    return source.mode === "html-deep" ? "页面可访问但没有识别出文章链接，可能需要翻页或 JS 渲染。" : "信源返回正常但没有新候选。";
+  }
+  return "已成功进入信息库。";
+}
+
 function isOfficialCompetitorSource(source) {
   const text = `${source.category} ${source.secondaryCategory} ${source.name} ${source.url}`.toLowerCase();
   return normalizeSourceCategory(source.category) === "竞品情报" && /官方|官网|blog|pricing|youtube|tiktok|instagram|facebook|linkedin|x\.com|twitter/.test(text);
@@ -323,14 +448,33 @@ function normalizeSourceCategory(category) {
 }
 
 async function fetchText(url) {
+  let lastError;
+  for (let attempt = 1; attempt <= FETCH_RETRY_COUNT; attempt += 1) {
+    try {
+      return await fetchTextOnce(url);
+    } catch (error) {
+      lastError = error;
+      if (attempt === FETCH_RETRY_COUNT || !isRetryableFetchError(error)) break;
+      await wait(350 * attempt);
+    }
+  }
+
+  const attempts = FETCH_RETRY_COUNT > 1 && isRetryableFetchError(lastError) ? ` after ${FETCH_RETRY_COUNT} attempts` : "";
+  throw new Error(`${lastError.message}${attempts}`);
+}
+
+async function fetchTextOnce(url) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "vpn-intelligence-center/1.0 (+https://github.com)",
-        "Accept": "application/rss+xml, application/xml, text/html;q=0.9, */*;q=0.8",
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+        "Accept": "application/rss+xml, application/xml, text/html;q=0.9,application/xhtml+xml;q=0.8,*/*;q=0.7",
+        "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
+        "Cache-Control": "no-cache",
       },
     });
     if (!response.ok) {
@@ -340,6 +484,14 @@ async function fetchText(url) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function isRetryableFetchError(error) {
+  return /fetch failed|AbortError|aborted|timeout|HTTP 408|HTTP 409|HTTP 425|HTTP 429|HTTP 5\d{2}/i.test(error?.message || "");
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function parseRss(xml) {
@@ -711,6 +863,18 @@ function classifyItem(item, source, keywords) {
   };
 }
 
+function explainRejectedItem(item, source, keywords) {
+  const text = `${item.title} ${item.summary}`.toLowerCase();
+  const sourcePanel = inferSourcePanel(source);
+  if (sourcePanel === "政策风险" && !isOfficialPolicySource(source) && !source.collectionProfile) return "政策风险只保留官方或专题任务来源";
+  if (source.collectionProfile && !profileMatchesItem(item, source)) return "不符合专题纳入关键词或命中排除词";
+  if (source.collectionProfile && !isFreshProfileItem(item)) return "发布时间超出专题时效窗口";
+
+  const relevance = scoreVpnRelevance(text, source, keywords, sourcePanel);
+  if (relevance.score < relevance.minScore) return `相关性分 ${relevance.score} 低于入库阈值 ${relevance.minScore}`;
+  return "重复信息或缺少可用标题";
+}
+
 function profileMatchesItem(item, source) {
   const text = `${item.title} ${item.summary}`.toLowerCase();
   if ((source.excludeKeywords ?? []).some((keyword) => text.includes(String(keyword).toLowerCase()))) return false;
@@ -735,6 +899,29 @@ function scoreVpnRelevance(text, source, keywords, panel) {
     sourceBonus(source, panel);
   const restrictionScore = countMatches(text, ["blocked", "restriction", "geo", "region", "unblock", "access", "payment", "age verification", "blackout", "not available", "地区", "限制", "跨区"]);
   const discussionScore = countMatches(text, ["reddit", "forum", "community", "thread", "discussion", "用户", "讨论"]);
+  const profileKeywordScore = source.collectionProfile ? countMatches(text, source.includeKeywords ?? []) + countMatches(text, source.searchKeywords ?? []) : 0;
+
+  if (source.collectionProfile && panel === "增长热点") {
+    const growthScore = profileKeywordScore + countMatches(text, keywords.platforms) + restrictionScore * 2 + sourceBonus(source, panel);
+    return {
+      score: growthScore,
+      minScore: 2,
+      coreScore: 6,
+      label: growthScore >= 6 ? "VPN 强相关" : "热点候选待验证",
+      priority: growthScore >= 6 ? "P1" : "P2",
+    };
+  }
+
+  if (source.collectionProfile && panel === "政策风险") {
+    const policyScore = profileKeywordScore + countMatches(text, ["law", "regulation", "policy", "privacy", "security", "vpn", "age verification", "compliance", "ban", "restriction"]) * 2 + sourceBonus(source, panel);
+    return {
+      score: policyScore,
+      minScore: 2,
+      coreScore: 6,
+      label: policyScore >= 6 ? "官方高相关" : "政策候选待验证",
+      priority: policyScore >= 6 ? "P1" : "P2",
+    };
+  }
 
   if (panel === "增长热点") {
     const growthScore = score + restrictionScore * 2;

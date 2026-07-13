@@ -1,11 +1,11 @@
 declare module "cloudflare:workers" {
   export const env: {
-    DB?: any;
-    [key: string]: any;
+    DB?: unknown;
+    [key: string]: unknown;
   };
 }
 
-type D1Database = any;
+type D1Database = unknown;
 
 interface Fetcher {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;

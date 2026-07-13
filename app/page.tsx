@@ -7,8 +7,9 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 type Priority = "高" | "中" | "低";
 type Trend = "新出现" | "升温" | "稳定" | "降温" | "样本不足";
-type PanelView = "竞品情报" | "用户声音" | "增长热点" | "政策风险" | "历史信息库" | "潜在机会" | "信息源管理";
+type PanelView = "竞品情报" | "用户声音" | "增长热点" | "政策风险" | "历史信息库" | "潜在机会" | "抓取诊断" | "信息源管理";
 type HotspotView = "影视" | "体育" | "游戏";
+type CrawlDiagnosticStatus = "入库" | "候选未入库" | "无候选" | "抓取失败";
 
 type SourceRule = {
   id: string;
@@ -117,6 +118,42 @@ type SourceStat = {
   color: string;
 };
 
+type CrawlRejectedSample = {
+  title: string;
+  reason: string;
+};
+
+type CrawlDiagnosticRecord = {
+  id: string;
+  name: string;
+  panel: string;
+  category: string;
+  method: string;
+  url: string;
+  status: CrawlDiagnosticStatus;
+  checkedAt: string;
+  candidateCount: number;
+  rawCandidateCount: number;
+  acceptedCount: number;
+  rejectedCount: number;
+  collectionProfileName?: string;
+  collectionKeyword?: string;
+  acceptedSamples?: string[];
+  rejectedSamples?: CrawlRejectedSample[];
+  failureReason?: string;
+  note: string;
+};
+
+type CrawlDiagnostics = {
+  generatedAt: string;
+  checkedSources: number;
+  candidateItems: number;
+  acceptedItems: number;
+  failedSources: number;
+  filteredItems: number;
+  records: CrawlDiagnosticRecord[];
+};
+
 type IntelligenceData = {
   generatedAt: string;
   displayDate: string;
@@ -133,6 +170,7 @@ type IntelligenceData = {
   themes: Theme[];
   evidence: Evidence[];
   opportunities: Opportunity[];
+  crawlDiagnostics?: CrawlDiagnostics;
 };
 
 type CollectionProfile = {
@@ -163,7 +201,7 @@ const intelligence = intelligenceData as IntelligenceData;
 const sourceRules = sourceRulesData as SourceRulesData;
 const collectionProfiles = (collectionProfilesData as CollectionProfilesData).profiles;
 
-const panelViews: PanelView[] = ["竞品情报", "用户声音", "增长热点", "政策风险", "历史信息库", "潜在机会", "信息源管理"];
+const panelViews: PanelView[] = ["竞品情报", "用户声音", "增长热点", "政策风险", "历史信息库", "潜在机会", "抓取诊断", "信息源管理"];
 const hotspotViews: HotspotView[] = ["影视", "体育", "游戏"];
 const competitorNames = ["NordVPN", "ExpressVPN", "Surfshark", "Proton VPN", "CyberGhost", "PIA VPN"];
 const sourceCategories = ["竞品情报", "用户声音", "SEO搜索", "第三方媒体", "政策监管", "需求触发市场"];
@@ -203,6 +241,12 @@ const trendStyles: Record<string, string> = {
   "稳定": "border-emerald-200 bg-emerald-50 text-emerald-700",
   "降温": "border-zinc-200 bg-zinc-50 text-zinc-600",
   "样本不足": "border-amber-200 bg-amber-50 text-amber-800",
+};
+const diagnosticStyles: Record<CrawlDiagnosticStatus, string> = {
+  "入库": "border-emerald-200 bg-emerald-50 text-emerald-700",
+  "候选未入库": "border-amber-200 bg-amber-50 text-amber-800",
+  "无候选": "border-zinc-200 bg-zinc-50 text-zinc-600",
+  "抓取失败": "border-rose-200 bg-rose-50 text-rose-700",
 };
 
 function sourceCategoryLabel(category: string) {
@@ -554,6 +598,87 @@ function ProfileMethodPanel({ profiles }: { profiles: CollectionProfile[] }) {
   );
 }
 
+function createEmptyDiagnostics(): CrawlDiagnostics {
+  return {
+    generatedAt: intelligence.generatedAt,
+    checkedSources: 0,
+    candidateItems: 0,
+    acceptedItems: 0,
+    failedSources: 0,
+    filteredItems: 0,
+    records: [],
+  };
+}
+
+function diagnosticSortWeight(status: CrawlDiagnosticStatus) {
+  if (status === "抓取失败") return 0;
+  if (status === "候选未入库") return 1;
+  if (status === "无候选") return 2;
+  return 3;
+}
+
+function diagnosticAction(record: CrawlDiagnosticRecord) {
+  if (record.status === "抓取失败") {
+    if (/403|401|forbidden/i.test(record.failureReason ?? "")) return "改用浏览器渲染、官方 RSS/API，或为该站点做专门适配。";
+    return "保留自动重试，同时用搜索任务或人工抽检补扫该来源。";
+  }
+  if (record.status === "候选未入库") return "查看过滤样例，判断是否需要放宽关键词或调整专题口径。";
+  if (record.status === "无候选") return "确认该信源今天是否有更新；页面型信源可补充翻页规则。";
+  return "无需处理，可继续观察入库质量。";
+}
+
+function CrawlDiagnosticCard({ record }: { record: CrawlDiagnosticRecord }) {
+  return (
+    <article className="rounded-md border border-zinc-200 bg-white p-4">
+      <div className="flex flex-wrap gap-2">
+        <Badge className={diagnosticStyles[record.status]}>{record.status}</Badge>
+        <Badge className="border-zinc-200 bg-white text-zinc-600">{record.panel}</Badge>
+        <Badge className="border-zinc-200 bg-white text-zinc-600">{record.method}</Badge>
+        {record.collectionProfileName && <Badge className="border-indigo-200 bg-indigo-50 text-indigo-700">{record.collectionProfileName}</Badge>}
+        {record.collectionKeyword && <Badge className="border-zinc-200 bg-white text-zinc-600">关键词: {record.collectionKeyword}</Badge>}
+      </div>
+      <h3 className="mt-3 break-words text-base font-semibold text-zinc-950">{record.name}</h3>
+      <p className="mt-2 break-all text-xs leading-5 text-zinc-500">{record.url}</p>
+      <div className="mt-3 grid gap-2 text-xs text-zinc-500 sm:grid-cols-4">
+        <span>原始候选：<strong className="text-zinc-950">{record.rawCandidateCount}</strong></span>
+        <span>检查候选：<strong className="text-zinc-950">{record.candidateCount}</strong></span>
+        <span>已入库：<strong className="text-zinc-950">{record.acceptedCount}</strong></span>
+        <span>被过滤：<strong className="text-zinc-950">{record.rejectedCount}</strong></span>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-zinc-600">{record.note}</p>
+      <p className="mt-1 text-sm font-semibold text-teal-700">建议：{diagnosticAction(record)}</p>
+      {record.failureReason && <p className="mt-2 break-words text-xs text-rose-700">失败原因：{record.failureReason}</p>}
+
+      {Boolean(record.rejectedSamples?.length || record.acceptedSamples?.length) && (
+        <details className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+          <summary className="cursor-pointer text-sm font-semibold text-teal-700">查看样例</summary>
+          {Boolean(record.acceptedSamples?.length) && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold text-zinc-500">入库样例</p>
+              <ul className="mt-2 grid gap-1 text-xs leading-5 text-zinc-600">
+                {record.acceptedSamples?.map((sample) => <li key={sample}>{sample}</li>)}
+              </ul>
+            </div>
+          )}
+          {Boolean(record.rejectedSamples?.length) && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold text-zinc-500">过滤样例</p>
+              <ul className="mt-2 grid gap-2 text-xs leading-5 text-zinc-600">
+                {record.rejectedSamples?.map((sample) => (
+                  <li key={`${sample.title}-${sample.reason}`}>
+                    <span className="font-semibold text-zinc-800">{sample.title}</span>
+                    <span className="block text-zinc-500">原因：{sample.reason}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </details>
+      )}
+    </article>
+  );
+}
+
 export default function Home() {
   const [activeView, setActiveView] = useState<PanelView>("竞品情报");
   const [hotspotView, setHotspotView] = useState<HotspotView>("影视");
@@ -567,6 +692,7 @@ export default function Home() {
   const [opportunityEdits, setOpportunityEdits] = useState<Record<string, OpportunityEdit>>({});
   const [opportunityReady, setOpportunityReady] = useState(false);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (typeof window === "undefined") {
       setSourceCatalogReady(true);
@@ -591,6 +717,7 @@ export default function Home() {
     setSourceCatalogReady(true);
     setOpportunityReady(true);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!sourceCatalogReady || typeof window === "undefined") return;
@@ -644,6 +771,26 @@ export default function Home() {
     const domain = sourceDomain(source.url);
     return sourceCategoryLabel(source.category) === "政策监管" && (/\.gov|europa\.eu|ofcom|ftc|ico\.org|cnil|edpb/.test(domain) || /政府|监管|官方|标准/.test(source.secondaryCategory));
   }).length;
+  const crawlDiagnostics = intelligence.crawlDiagnostics ?? createEmptyDiagnostics();
+  const diagnosticRecords = [...crawlDiagnostics.records].sort((a, b) => diagnosticSortWeight(a.status) - diagnosticSortWeight(b.status));
+  const problemDiagnostics = diagnosticRecords.filter((record) => record.status !== "入库").slice(0, 28);
+  const successfulDiagnostics = diagnosticRecords.filter((record) => record.status === "入库").slice(0, 8);
+  const diagnosticStatusCounts = (["抓取失败", "候选未入库", "无候选", "入库"] as CrawlDiagnosticStatus[]).map((status) => ({
+    status,
+    count: diagnosticRecords.filter((record) => record.status === status).length,
+  }));
+  const diagnosticPanelCounts = panelViews
+    .filter((view) => !["潜在机会", "抓取诊断", "信息源管理"].includes(view))
+    .map((panel) => {
+      const records = diagnosticRecords.filter((record) => record.panel === panel);
+      return {
+        panel,
+        total: records.length,
+        failed: records.filter((record) => record.status === "抓取失败").length,
+        accepted: records.filter((record) => record.status === "入库").length,
+      };
+    })
+    .filter((item) => item.total > 0);
 
   function updateSourceForm<K extends keyof SourceRule>(key: K, value: SourceRule[K]) {
     setSourceForm((current) => ({ ...current, [key]: value }));
@@ -1024,6 +1171,103 @@ export default function Home() {
                   );
                 })}
               </section>
+            </div>
+          )}
+
+          {activeView === "抓取诊断" && (
+            <div className="grid gap-5">
+              <section className="bg-white px-5 py-5">
+                <SectionHeader
+                  eyebrow="Crawl Diagnostics"
+                  title="抓取诊断"
+                  summary="解释为什么信源很多但入库信息少：区分抓取失败、没有新候选、候选被过滤和已经入库，便于调整抓取方式与过滤口径。"
+                  right={<Badge className="border-rose-200 bg-rose-50 text-rose-700">失败 {crawlDiagnostics.failedSources}</Badge>}
+                />
+                <div className="mt-5 grid gap-3 md:grid-cols-5">
+                  <Metric label="本次检查" value={crawlDiagnostics.checkedSources} />
+                  <Metric label="候选信息" value={crawlDiagnostics.candidateItems} />
+                  <Metric label="入库信息" value={crawlDiagnostics.acceptedItems} />
+                  <Metric label="过滤信息" value={crawlDiagnostics.filteredItems} />
+                  <Metric label="抓取失败" value={crawlDiagnostics.failedSources} />
+                </div>
+                <p className="mt-3 text-xs text-zinc-500">诊断生成：北京时间 {formatDateTime(crawlDiagnostics.generatedAt)}</p>
+              </section>
+
+              <section className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+                <div className="grid gap-4">
+                  <section className="rounded-md border border-zinc-200 bg-white p-4">
+                    <h3 className="font-semibold">状态分布</h3>
+                    <div className="mt-4 grid gap-3">
+                      {diagnosticStatusCounts.map((item) => (
+                        <div key={item.status}>
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <Badge className={diagnosticStyles[item.status]}>{item.status}</Badge>
+                            <span className="font-semibold">{item.count}</span>
+                          </div>
+                          <div className="mt-2 h-2 rounded-full bg-zinc-100">
+                            <div
+                              className={`h-2 rounded-full ${
+                                item.status === "抓取失败"
+                                  ? "bg-rose-500"
+                                  : item.status === "候选未入库"
+                                    ? "bg-amber-500"
+                                    : item.status === "入库"
+                                      ? "bg-emerald-500"
+                                      : "bg-zinc-300"
+                              }`}
+                              style={{ width: `${Math.min(100, (item.count / Math.max(1, diagnosticRecords.length)) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="rounded-md border border-zinc-200 bg-white p-4">
+                    <h3 className="font-semibold">按板块看</h3>
+                    <div className="mt-4 grid gap-3">
+                      {diagnosticPanelCounts.map((item) => (
+                        <div key={item.panel} className="border-b border-zinc-100 pb-3 last:border-0 last:pb-0">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-sm font-semibold">{item.panel}</span>
+                            <span className="text-xs text-zinc-500">检查 {item.total}</span>
+                          </div>
+                          <p className="mt-1 text-xs text-zinc-500">入库 {item.accepted} · 失败 {item.failed}</p>
+                        </div>
+                      ))}
+                      {diagnosticPanelCounts.length === 0 && <p className="text-sm text-zinc-500">暂无诊断数据。</p>}
+                    </div>
+                  </section>
+
+                  <section className="rounded-md border border-zinc-200 bg-white p-4">
+                    <h3 className="font-semibold">判断口径</h3>
+                    <p className="mt-3 text-sm leading-6 text-zinc-600">
+                      增长热点专题先保留平台、定价、区域、版权、访问规则等候选，再标注 VPN 相关性；政策风险仍优先官方来源；候选未入库会保留过滤样例，便于人工复查。
+                    </p>
+                  </section>
+                </div>
+
+                <section className="grid gap-3">
+                  <SectionHeader
+                    title="优先处理"
+                    summary="先看失败和候选未入库的来源，这些通常解释了信息量不足的原因。"
+                    right={<Badge className="border-zinc-200 bg-zinc-50 text-zinc-600">{problemDiagnostics.length} 条</Badge>}
+                  />
+                  {problemDiagnostics.map((record) => <CrawlDiagnosticCard key={record.id} record={record} />)}
+                  {problemDiagnostics.length === 0 && (
+                    <div className="rounded-md border border-zinc-200 bg-white p-6 text-sm text-zinc-500">本次没有需要优先处理的抓取问题。</div>
+                  )}
+                </section>
+              </section>
+
+              {successfulDiagnostics.length > 0 && (
+                <section className="grid gap-3">
+                  <SectionHeader title="已入库样例" summary="用于确认当前抓取逻辑是否已经覆盖到有效信息。" />
+                  <div className="grid gap-3 xl:grid-cols-2">
+                    {successfulDiagnostics.map((record) => <CrawlDiagnosticCard key={record.id} record={record} />)}
+                  </div>
+                </section>
+              )}
             </div>
           )}
 
