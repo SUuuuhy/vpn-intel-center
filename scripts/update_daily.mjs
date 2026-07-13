@@ -1007,8 +1007,8 @@ function isLowValueEvidenceSnapshot(item) {
   const title = `${item.originalTitle || item.title || ""}`.toLowerCase();
   const isCompetitorStaticSource = /竞品情报|surfshark\.com|expressvpn\.com|protonvpn\.com|privateinternetaccess\.com|nordvpn\.com|cyberghostvpn\.com|ipvanish\.com/.test(sourceText);
   if (!/instagram|tiktok|linkedin|x\.com|twitter|facebook|youtube|官网|official|pricing/.test(sourceText) && !isCompetitorStaticSource) return false;
-  if (/expressvpn blog|the proton blog|blog: all things|all things digital privacy/.test(title)) return true;
-  if (/news|blog|press|release|article|announc|update|launch|report|study|deal|price increase/.test(title)) return false;
+  if (/expressvpn blog|expressvpn press room|the proton blog|blog: all things|all things digital privacy|the best vpn for speed|fast, secure|mullvad vpn|privacy is a universal right|unlock content with a fast|welcome to the private internet access blog/.test(title)) return true;
+  if (/\b(news|press|release|article|announce|announcement|update|launch|report|study|deal)\b|price increase/.test(title)) return false;
   return /instagram|tiktok|linkedin|job search|creative center|\/ x$|youtube|facebook|best vpn service|pricing|official site|home|login|sign up|all-in-one cybersecurity|buy vpn|expressvpn blog|the proton blog|server locations/.test(title);
 }
 
