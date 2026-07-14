@@ -154,6 +154,43 @@ type CrawlDiagnostics = {
   records: CrawlDiagnosticRecord[];
 };
 
+type SportsMarketPlatform = {
+  market: string;
+  platform: string;
+  access: string;
+  restriction: string;
+  priority: Priority;
+  url?: string;
+};
+
+type SportsEvent = {
+  id: string;
+  sport: string;
+  event: string;
+  startDate: string;
+  endDate: string;
+  priority: Priority;
+  stage: string;
+  watchReason: string;
+  ukPlatform: string;
+  ukAccess: string;
+  usPlatform: string;
+  usAccess: string;
+  restriction: string;
+  officialUrl?: string;
+  officialSocial?: string;
+  keywords: string[];
+  markets: SportsMarketPlatform[];
+};
+
+type SportsHotspots = {
+  generatedAt: string;
+  windowLabel: string;
+  summaryRule: string;
+  events: SportsEvent[];
+  platformNotes: SportsMarketPlatform[];
+};
+
 type IntelligenceData = {
   generatedAt: string;
   displayDate: string;
@@ -169,6 +206,7 @@ type IntelligenceData = {
   briefingItems: BriefingItem[];
   themes: Theme[];
   evidence: Evidence[];
+  sportsHotspots?: SportsHotspots;
   opportunities: Opportunity[];
   crawlDiagnostics?: CrawlDiagnostics;
 };
@@ -391,6 +429,18 @@ function isGrowthEvidence(item: Evidence) {
   return item.sourceType === "需求触发市场" || Boolean(item.hotspotType) || /netflix|bbc|iplayer|hulu|disney|espn|world cup|f1|steam|game|stream|sports/.test(text);
 }
 
+function isSportsEvidence(item: Evidence) {
+  const text = `${item.title} ${item.originalTitle ?? ""} ${item.summary} ${item.source} ${item.hotspotType ?? ""}`.toLowerCase();
+  const hasSportsObject = /world cup|fifa|formula 1|\bf1\b|grand prix|wimbledon|us open|national bank open|premier league|ufc|fight night|wwe|summerslam|tennis|体育|赛事|世界杯|温布尔登/.test(text);
+  const hasSportsPlatform = /espn|fox sports|bbc iplayer|itvx|channel 4|peacock|apple tv|f1 tv|sky sports|tennis channel|paramount/.test(text);
+  return item.hotspotType === "体育" || hasSportsObject || (hasSportsPlatform && /watch|stream|live|blackout|vpn|free|outside|abroad|from anywhere/.test(text));
+}
+
+function isSportsVpnEvidence(item: Evidence) {
+  const text = `${item.title} ${item.originalTitle ?? ""} ${item.summary} ${item.collectionRule ?? ""}`.toLowerCase();
+  return item.collectionProfile === "sports-event-vpn-dynamics" || (isSportsEvidence(item) && /vpn|free|from anywhere|outside|abroad|blackout|geo|region|not available|watch|stream|地区|限制|跨区/.test(text));
+}
+
 function sortByTime<T extends { time?: string; updatedAt?: string }>(items: T[]) {
   return [...items].sort((a, b) => String(b.time ?? b.updatedAt ?? "").localeCompare(String(a.time ?? a.updatedAt ?? "")));
 }
@@ -510,6 +560,54 @@ function formatDateTime(value: string) {
   }).format(date);
 }
 
+function formatDateRange(startValue: string, endValue: string) {
+  const start = new Date(startValue);
+  const end = new Date(endValue);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return `${startValue} - ${endValue}`;
+  const formatter = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit" });
+  return formatter.format(start) === formatter.format(end) ? formatter.format(start) : `${formatter.format(start)} - ${formatter.format(end)}`;
+}
+
+function eventStatus(event: SportsEvent) {
+  const today = startOfDay(new Date(intelligence.generatedAt || Date.now()));
+  const start = startOfDay(new Date(event.startDate));
+  const end = startOfDay(new Date(event.endDate));
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "待确认";
+  if (today >= start && today <= end) return "进行中";
+  const daysUntil = Math.ceil((start.getTime() - today.getTime()) / 86400000);
+  if (daysUntil <= 7 && daysUntil >= 0) return "7天内";
+  if (daysUntil <= 30 && daysUntil >= 0) return "30天内";
+  if (daysUntil < 0) return "已结束";
+  return "远期观察";
+}
+
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function eventEvidence(event: SportsEvent, evidence: Evidence[]) {
+  const eventKeywords = event.keywords.map((keyword) => keyword.toLowerCase());
+  return evidence
+    .filter((item) => {
+      const text = `${item.title} ${item.originalTitle ?? ""} ${item.summary} ${item.source}`.toLowerCase();
+      return eventKeywords.some((keyword) => text.includes(keyword));
+    })
+    .slice(0, 3);
+}
+
+function sportsEventSortValue(event: SportsEvent) {
+  const status = eventStatus(event);
+  const statusWeight: Record<string, number> = {
+    "进行中": 0,
+    "7天内": 1,
+    "30天内": 2,
+    "远期观察": 3,
+    "待确认": 4,
+    "已结束": 5,
+  };
+  return `${statusWeight[status] ?? 4}-${event.startDate}`;
+}
+
 function Badge({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <span className={`inline-flex min-h-7 items-center rounded-full border px-3 text-xs font-semibold ${className}`}>{children}</span>;
 }
@@ -569,6 +667,140 @@ function EvidenceCard({ item, compact = false }: { item: Evidence; compact?: boo
       </div>
       {item.collectionRule && <p className="mt-2 text-xs leading-5 text-zinc-500">收录口径：{item.collectionRule}</p>}
       <SourceDisclosure item={item} />
+    </article>
+  );
+}
+
+function SportsHotspotPanel({ sports, evidence }: { sports?: SportsHotspots; evidence: Evidence[] }) {
+  if (!sports) {
+    return (
+      <section className="rounded-md border border-zinc-200 bg-white p-5">
+        <h3 className="font-semibold">体育赛事热点</h3>
+        <p className="mt-2 text-sm leading-6 text-zinc-600">暂未配置赛事热点清单。</p>
+      </section>
+    );
+  }
+
+  const sortedEvents = [...sports.events].sort((a, b) => sportsEventSortValue(a).localeCompare(sportsEventSortValue(b))).slice(0, 8);
+  const highEvents = sortedEvents.filter((event) => event.priority === "高").length;
+  const restrictedMarkets = sports.platformNotes.filter((market) => /免费/.test(market.access) && /限制|本地|仅/.test(market.restriction)).length;
+
+  return (
+    <div className="grid gap-5">
+      <section className="grid gap-3 md:grid-cols-4">
+        <Metric label="近期赛事" value={sortedEvents.length} hint={sports.windowLabel} />
+        <Metric label="高优先级" value={highEvents} hint="免费或强地区限制优先" />
+        <Metric label="免费受限市场" value={restrictedMarkets} hint="可作为跨区需求切入点" />
+        <Metric label="VPN相关信息" value={evidence.length} hint="来自自动抓取结果" />
+      </section>
+
+      <section className="bg-white px-5 py-5">
+        <SectionHeader
+          eyebrow="Sports Watchlist"
+          title="近期赛事观察"
+          summary={sports.summaryRule}
+          right={<Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">按赛事维护</Badge>}
+        />
+        <div className="mt-5 grid gap-4 xl:grid-cols-2">
+          {sortedEvents.map((event) => (
+            <SportsEventCard key={event.id} event={event} evidence={eventEvidence(event, evidence)} />
+          ))}
+        </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+        <article className="rounded-md border border-zinc-200 bg-white p-4">
+          <h3 className="font-semibold">重点平台/市场口径</h3>
+          <div className="mt-4 grid gap-3">
+            {sports.platformNotes.slice(0, 8).map((market) => (
+              <div key={`${market.market}-${market.platform}`} className="border-b border-zinc-100 pb-3 last:border-0 last:pb-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className={priorityStyles[market.priority]}>{market.priority}</Badge>
+                  <span className="text-sm font-semibold text-zinc-950">{market.market}</span>
+                  <span className="text-sm text-zinc-500">{market.platform}</span>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-zinc-600">{market.access}；{market.restriction}</p>
+                {market.url && <a className="mt-1 block break-all text-xs text-teal-700 hover:text-zinc-950" href={market.url} target="_blank" rel="noreferrer">{market.url}</a>}
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="rounded-md border border-zinc-200 bg-white p-4">
+          <h3 className="font-semibold">最新 VPN 相关信息</h3>
+          <div className="mt-4 grid gap-3">
+            {evidence.slice(0, 5).map((item) => (
+              <div key={item.id} className="border-b border-zinc-100 pb-3 last:border-0 last:pb-0">
+                <div className="flex flex-wrap gap-2">
+                  <Badge className={item.role === "核心证据" ? "border-teal-200 bg-teal-50 text-teal-700" : "border-zinc-200 bg-zinc-50 text-zinc-600"}>{item.role}</Badge>
+                  {item.vpnRelevance && <Badge className="border-cyan-200 bg-cyan-50 text-cyan-700">{item.vpnRelevance}</Badge>}
+                </div>
+                <p className="mt-2 text-sm font-semibold text-zinc-950">{item.title}</p>
+                <p className="mt-1 text-xs leading-5 text-zinc-500">{extractNeedText(item)}</p>
+                <SourceDisclosure item={item} />
+              </div>
+            ))}
+            {evidence.length === 0 && <p className="text-sm leading-6 text-zinc-600">今日暂未抓到符合 VPN 相关标准的赛事信息。</p>}
+          </div>
+        </article>
+      </section>
+    </div>
+  );
+}
+
+function SportsEventCard({ event, evidence }: { event: SportsEvent; evidence: Evidence[] }) {
+  const status = eventStatus(event);
+  return (
+    <article className="rounded-md border border-zinc-200 bg-white p-4">
+      <div className="flex flex-wrap gap-2">
+        <Badge className={priorityStyles[event.priority]}>{event.priority}</Badge>
+        <Badge className={trendStyles[status] ?? "border-zinc-200 bg-zinc-50 text-zinc-600"}>{status}</Badge>
+        <Badge className="border-zinc-200 bg-white text-zinc-600">{event.sport}</Badge>
+      </div>
+      <h3 className="mt-3 text-lg font-semibold text-zinc-950">{event.event}</h3>
+      <p className="mt-1 text-xs font-semibold text-teal-700">{formatDateRange(event.startDate, event.endDate)} · {event.stage}</p>
+      <p className="mt-3 text-sm leading-6 text-zinc-600">{event.watchReason}</p>
+
+      <div className="mt-4 grid gap-3 border-t border-zinc-100 pt-4 md:grid-cols-2">
+        <div>
+          <p className="text-xs font-semibold text-zinc-500">UK 观看平台</p>
+          <p className="mt-1 text-sm leading-6 text-zinc-950">{event.ukPlatform}</p>
+          <p className="mt-1 text-xs leading-5 text-zinc-500">{event.ukAccess}</p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-zinc-500">US 观看平台</p>
+          <p className="mt-1 text-sm leading-6 text-zinc-950">{event.usPlatform}</p>
+          <p className="mt-1 text-xs leading-5 text-zinc-500">{event.usAccess}</p>
+        </div>
+      </div>
+
+      <div className="mt-4 border-t border-zinc-100 pt-4">
+        <p className="text-xs font-semibold text-zinc-500">地区限制/机会判断</p>
+        <p className="mt-1 text-sm leading-6 text-zinc-600">{event.restriction}</p>
+      </div>
+
+      <div className="mt-4 border-t border-zinc-100 pt-4">
+        <p className="text-xs font-semibold text-zinc-500">重点市场</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {event.markets.slice(0, 4).map((market) => (
+            <Badge key={`${event.id}-${market.market}-${market.platform}`} className={priorityStyles[market.priority]}>
+              {market.market} · {market.platform}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4 border-t border-zinc-100 pt-4">
+        <p className="text-xs font-semibold text-zinc-500">相关 VPN 信息</p>
+        <div className="mt-2 grid gap-2">
+          {evidence.map((item) => (
+            <a key={item.id} className="break-words text-xs leading-5 text-teal-700 hover:text-zinc-950" href={item.url} target="_blank" rel="noreferrer">
+              {item.originalTitle ?? item.title}
+            </a>
+          ))}
+          {evidence.length === 0 && <span className="text-xs leading-5 text-zinc-500">暂无直接匹配的最新信息，继续观察。</span>}
+        </div>
+      </div>
     </article>
   );
 }
@@ -738,6 +970,7 @@ export default function Home() {
   const competitorItems = sortByTime(intelligence.evidence.filter(isCompetitorEvidence)).slice(0, 10);
   const userVoiceItems = sortByTime(intelligence.evidence.filter(isUserVoiceEvidence)).slice(0, 10);
   const growthItems = sortByTime(intelligence.evidence.filter(isGrowthEvidence)).slice(0, 10);
+  const sportsItems = sortByTime(intelligence.evidence.filter(isSportsVpnEvidence));
   const policyItems = uniquePolicyItems(sortByTime(intelligence.evidence.filter(isPolicyEvidence))).slice(0, 8);
   const hotspots = createGrowthHotspots(growthItems, intelligence.themes, managedSources);
   const l2Themes = intelligence.themes.filter((theme) => theme.coreEvidence >= 3 || theme.priority === "高");
@@ -1024,24 +1257,28 @@ export default function Home() {
                 </div>
               </section>
 
-              <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {hotspots[hotspotView].map((theme) => (
-                  <article key={theme.id} className="rounded-md border border-zinc-200 bg-white p-4">
-                    <div className="flex flex-wrap gap-2">
-                      <Badge className={priorityStyles[theme.priority]}>{theme.priority}</Badge>
-                      <Badge className={trendStyles[theme.trend] ?? trendStyles["稳定"]}>{theme.trend}</Badge>
-                      <Badge className="border-zinc-200 bg-white text-zinc-600">{theme.market}</Badge>
-                    </div>
-                    <h3 className="mt-3 font-semibold">{theme.title}</h3>
-                    <p className="mt-2 text-sm leading-6 text-zinc-600">{theme.summary}</p>
-                    <div className="mt-4 grid gap-1 text-xs text-zinc-500">
-                      <span>平台/对象：{theme.platform || "待识别"}</span>
-                      <span>核心证据：{theme.coreEvidence}</span>
-                      <span>VPN 标准：有地区、版权、平台或网络限制时进入机会观察</span>
-                    </div>
-                  </article>
-                ))}
-              </section>
+              {hotspotView === "体育" ? (
+                <SportsHotspotPanel sports={intelligence.sportsHotspots} evidence={sportsItems} />
+              ) : (
+                <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {hotspots[hotspotView].map((theme) => (
+                    <article key={theme.id} className="rounded-md border border-zinc-200 bg-white p-4">
+                      <div className="flex flex-wrap gap-2">
+                        <Badge className={priorityStyles[theme.priority]}>{theme.priority}</Badge>
+                        <Badge className={trendStyles[theme.trend] ?? trendStyles["稳定"]}>{theme.trend}</Badge>
+                        <Badge className="border-zinc-200 bg-white text-zinc-600">{theme.market}</Badge>
+                      </div>
+                      <h3 className="mt-3 font-semibold">{theme.title}</h3>
+                      <p className="mt-2 text-sm leading-6 text-zinc-600">{theme.summary}</p>
+                      <div className="mt-4 grid gap-1 text-xs text-zinc-500">
+                        <span>平台/对象：{theme.platform || "待识别"}</span>
+                        <span>核心证据：{theme.coreEvidence}</span>
+                        <span>VPN 标准：有地区、版权、平台或网络限制时进入机会观察</span>
+                      </div>
+                    </article>
+                  ))}
+                </section>
+              )}
 
               <ProfileMethodPanel profiles={growthProfiles} />
             </div>

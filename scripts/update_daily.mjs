@@ -204,6 +204,7 @@ function buildProfileSources(profiles) {
       collectionProfileName: profile.name,
       collectionKeyword: keyword,
       collectionRule: profile.summaryRule,
+      searchKeywords: [keyword],
       includeKeywords: profile.includeKeywords ?? [],
       excludeKeywords: profile.excludeKeywords ?? [],
     }));
@@ -643,7 +644,7 @@ function sanitizeEvidenceList(items) {
       ? inferThemeId(`${rawTitle} ${rawSummary}`.toLowerCase(), item.sourceType)
       : item.themeId;
     const shouldLocalize = item.id?.startsWith("auto-") || startsWithLatin(rawSummary) || !containsChinese(rawSummary);
-    const sourceInfo = { category: item.sourceType, name: item.source };
+    const sourceInfo = { category: item.sourceType, name: item.source, hotspotType: item.hotspotType };
 
     return {
       ...item,
@@ -715,6 +716,7 @@ function buildChineseTitle(rawTitle, source, themeId) {
   if (source.category === "SEO搜索") return `SEO 信号：${subject}${suffix}`;
   if (source.category === "第三方媒体") return `第三方评测：${subject}${suffix}`;
   if (source.category === "相关平台") return `平台生态：${subject}${suffix}`;
+  if (source.category === "需求触发市场" && source.hotspotType === "体育") return `体育热点：${subject}${suffix}`;
   if (source.category === "需求触发市场") return `需求对象：${subject}${suffix}`;
   return `${source.category || "外部情报"}：${subject}${suffix}`;
 }
@@ -750,8 +752,14 @@ function buildChineseSummary(rawTitle, rawSummary, source, themeId, role) {
 function inferSubject(text, themeId) {
   if (text.includes("age verification") || text.includes("age-verification") || text.includes("verification")) return "年龄验证与 VPN 限制";
   if (text.includes("privacy") || text.includes("law") || text.includes("regulation")) return "隐私监管与合规风险";
+  if (text.includes("world cup") || text.includes("fifa")) return "世界杯跨区观看";
+  if (text.includes("formula 1") || text.includes("f1") || text.includes("grand prix")) return "F1 赛事观看与地区限制";
+  if (text.includes("ufc") || text.includes("fight night")) return "UFC 赛事观看与平台限制";
+  if (text.includes("wwe") || text.includes("summerslam")) return "WWE 赛事平台差异";
+  if (text.includes("wimbledon") || text.includes("tennis channel") || text.includes("tennis tv")) return "网球赛事观看与黑屏限制";
+  if (text.includes("premier league")) return "英超赛事观看与版权限制";
+  if (text.includes("match") || text.includes("espn")) return "体育赛事观看与跨区访问";
   if (text.includes("bbc") || text.includes("iplayer") || themeId === "d1") return "BBC iPlayer 访问限制";
-  if (text.includes("world cup") || text.includes("match") || text.includes("espn")) return "体育赛事观看与跨区访问";
   if (text.includes("netflix") || text.includes("hulu") || text.includes("disney") || text.includes("stream")) return "流媒体访问需求";
   if (text.includes("payment") || text.includes("purchase") || text.includes("account") || themeId === "d2") return "跨区支付与账号限制";
   if (text.includes("price") || text.includes("deal") || text.includes("save") || text.includes("discount") || text.includes("month")) return "价格促销与套餐表达";
@@ -889,8 +897,31 @@ function explainRejectedItem(item, source, keywords) {
 function profileMatchesItem(item, source) {
   const text = `${item.title} ${item.summary}`.toLowerCase();
   if ((source.excludeKeywords ?? []).some((keyword) => text.includes(String(keyword).toLowerCase()))) return false;
+  if (source.collectionProfile === "sports-event-vpn-dynamics") return sportsProfileMatchesItem(text, source.collectionKeyword);
+  if (source.collectionProfile === "streaming-platform-dynamics" && isLowQualityStreamingProfileText(text)) return false;
   if ((source.includeKeywords ?? []).length === 0) return true;
   return source.includeKeywords.some((keyword) => text.includes(String(keyword).toLowerCase()));
+}
+
+function sportsProfileMatchesItem(text, collectionKeyword = "") {
+  const hasWatchContext = /vpn|free|from anywhere|outside|abroad|blackout|geo|not available|live stream|livestream|streaming|watch/.test(text);
+  if (!hasWatchContext) return false;
+  const keyword = String(collectionKeyword).toLowerCase();
+  if (keyword.includes("world cup")) return /world cup|fifa/.test(text);
+  if (keyword.includes("belgian grand prix")) return /\bf1\b|formula 1|belgian grand prix|belgium grand prix/.test(text);
+  if (keyword.includes("hungarian grand prix")) return /\bf1\b|formula 1|hungarian grand prix|hungary grand prix|m4 sport/.test(text);
+  if (keyword.includes("formula 1")) return /\bf1\b|formula 1|f1 tv|apple tv/.test(text);
+  if (keyword.includes("ufc")) return /ufc|fight night|paramount\+|tnt sports|fight pass/.test(text);
+  if (keyword.includes("wwe")) return /wwe|summerslam|netflix|espn|peacock/.test(text);
+  if (keyword.includes("premier league")) return /premier league|peacock|nbc sports/.test(text);
+  if (keyword.includes("tennis")) return /tennis|national bank open|tennis channel|tennis tv|blackout/.test(text);
+  return /world cup|fifa|\bf1\b|formula 1|ufc|wwe|premier league|tennis/.test(text);
+}
+
+function isLowQualityStreamingProfileText(text) {
+  if (/stock|shares|nasdaq|nyse|price target|analyst|earnings|marketbeat|investing\.com|tradingview|yahoo finance|marketscreener|jpmorgan|keybanc|oppenheimer/.test(text)) return true;
+  if (/celebrity|trailer|poster|recap|cast|box office/.test(text)) return true;
+  return false;
 }
 
 function isFreshProfileItem(item) {
@@ -1007,6 +1038,9 @@ function shouldKeepEvidenceItem(item) {
 function isLowValueEvidenceSnapshot(item) {
   const sourceText = `${item.sourceType} ${item.source} ${item.url || ""}`.toLowerCase();
   const title = `${item.originalTitle || item.title || ""}`.toLowerCase();
+  const originalText = `${item.originalTitle || item.title || ""}`.toLowerCase();
+  if (item.collectionProfile === "sports-event-vpn-dynamics" && !sportsProfileMatchesItem(originalText, item.collectionKeyword)) return true;
+  if (item.collectionProfile === "streaming-platform-dynamics" && isLowQualityStreamingProfileText(originalText)) return true;
   const isCompetitorStaticSource = /竞品情报|surfshark\.com|expressvpn\.com|protonvpn\.com|privateinternetaccess\.com|nordvpn\.com|cyberghostvpn\.com|ipvanish\.com/.test(sourceText);
   if (isStaticCompetitorUrl(item.url, item.sourceType, item.source, title)) return true;
   if (!/instagram|tiktok|linkedin|x\.com|twitter|facebook|youtube|官网|official|pricing/.test(sourceText) && !isCompetitorStaticSource) return false;

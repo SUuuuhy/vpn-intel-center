@@ -26,7 +26,11 @@
       "streaming",
       "privacy",
       "age verification",
-      "payment region"
+      "payment region",
+      "blackout",
+      "watch abroad",
+      "outside UK",
+      "outside US"
     ],
     "platforms": [
       "Netflix",
@@ -35,7 +39,20 @@
       "Disney+",
       "YouTube",
       "ESPN",
-      "iTunes"
+      "iTunes",
+      "ITVX",
+      "Channel 4",
+      "Peacock",
+      "Apple TV",
+      "FOX",
+      "FS1",
+      "Tubi",
+      "F1 TV",
+      "Sky Sports",
+      "M4 Sport",
+      "RTBF Auvio",
+      "Tennis Channel",
+      "Paramount+"
     ],
     "vpn": [
       "VPN",
