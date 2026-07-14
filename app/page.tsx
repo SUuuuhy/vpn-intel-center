@@ -608,6 +608,29 @@ function sportsEventSortValue(event: SportsEvent) {
   return `${statusWeight[status] ?? 4}-${event.startDate}`;
 }
 
+function formatCalendarDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return { day: value, weekday: "" };
+  const day = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit" }).format(date);
+  const weekday = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", weekday: "short" }).format(date);
+  return { day, weekday };
+}
+
+function eventMarketLabel(event: SportsEvent) {
+  const markets = Array.from(new Set(event.markets.map((market) => market.market).filter(Boolean)));
+  return markets.slice(0, 4).join(" / ") || "待确认";
+}
+
+function relatedEventsForPlatform(platform: SportsMarketPlatform, events: SportsEvent[]) {
+  const platformText = `${platform.market} ${platform.platform}`.toLowerCase();
+  return events
+    .filter((event) => {
+      const eventText = `${event.ukPlatform} ${event.usPlatform} ${event.markets.map((market) => `${market.market} ${market.platform}`).join(" ")}`.toLowerCase();
+      return event.markets.some((market) => market.market === platform.market) || platformText.split(/\s|\/|,|，|·/).some((token) => token.length > 2 && eventText.includes(token));
+    })
+    .slice(0, 3);
+}
+
 function Badge({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <span className={`inline-flex min-h-7 items-center rounded-full border px-3 text-xs font-semibold ${className}`}>{children}</span>;
 }
@@ -688,18 +711,25 @@ function SportsHotspotPanel({ sports, evidence }: { sports?: SportsHotspots; evi
   return (
     <div className="grid gap-5">
       <section className="grid gap-3 md:grid-cols-4">
-        <Metric label="近期赛事" value={sortedEvents.length} hint={sports.windowLabel} />
+        <Metric label="日历赛事" value={sortedEvents.length} hint={sports.windowLabel} />
         <Metric label="高优先级" value={highEvents} hint="免费或强地区限制优先" />
         <Metric label="免费受限市场" value={restrictedMarkets} hint="可作为跨区需求切入点" />
         <Metric label="VPN相关信息" value={evidence.length} hint="来自自动抓取结果" />
       </section>
 
+      <SportsCalendarView events={sortedEvents} evidence={evidence} summary={sports.summaryRule} />
+
+      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <SportsPlatformDirectory platforms={sports.platformNotes} events={sortedEvents} />
+        <SportsLatestEvidence evidence={evidence} />
+      </section>
+
       <section className="bg-white px-5 py-5">
         <SectionHeader
-          eyebrow="Sports Watchlist"
-          title="近期赛事观察"
-          summary={sports.summaryRule}
-          right={<Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">按赛事维护</Badge>}
+          eyebrow="Event Detail"
+          title="重点赛事详情"
+          summary="保留赛事级判断，方便查看为什么这场赛事值得关注，以及它可能触发什么跨区观看或平台访问需求。"
+          right={<Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">与日历同步</Badge>}
         />
         <div className="mt-5 grid gap-4 xl:grid-cols-2">
           {sortedEvents.map((event) => (
@@ -707,44 +737,132 @@ function SportsHotspotPanel({ sports, evidence }: { sports?: SportsHotspots; evi
           ))}
         </div>
       </section>
-
-      <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-        <article className="rounded-md border border-zinc-200 bg-white p-4">
-          <h3 className="font-semibold">重点平台/市场口径</h3>
-          <div className="mt-4 grid gap-3">
-            {sports.platformNotes.slice(0, 8).map((market) => (
-              <div key={`${market.market}-${market.platform}`} className="border-b border-zinc-100 pb-3 last:border-0 last:pb-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className={priorityStyles[market.priority]}>{market.priority}</Badge>
-                  <span className="text-sm font-semibold text-zinc-950">{market.market}</span>
-                  <span className="text-sm text-zinc-500">{market.platform}</span>
-                </div>
-                <p className="mt-2 text-xs leading-5 text-zinc-600">{market.access}；{market.restriction}</p>
-                {market.url && <a className="mt-1 block break-all text-xs text-teal-700 hover:text-zinc-950" href={market.url} target="_blank" rel="noreferrer">{market.url}</a>}
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="rounded-md border border-zinc-200 bg-white p-4">
-          <h3 className="font-semibold">最新 VPN 相关信息</h3>
-          <div className="mt-4 grid gap-3">
-            {evidence.slice(0, 5).map((item) => (
-              <div key={item.id} className="border-b border-zinc-100 pb-3 last:border-0 last:pb-0">
-                <div className="flex flex-wrap gap-2">
-                  <Badge className={item.role === "核心证据" ? "border-teal-200 bg-teal-50 text-teal-700" : "border-zinc-200 bg-zinc-50 text-zinc-600"}>{item.role}</Badge>
-                  {item.vpnRelevance && <Badge className="border-cyan-200 bg-cyan-50 text-cyan-700">{item.vpnRelevance}</Badge>}
-                </div>
-                <p className="mt-2 text-sm font-semibold text-zinc-950">{item.title}</p>
-                <p className="mt-1 text-xs leading-5 text-zinc-500">{extractNeedText(item)}</p>
-                <SourceDisclosure item={item} />
-              </div>
-            ))}
-            {evidence.length === 0 && <p className="text-sm leading-6 text-zinc-600">今日暂未抓到符合 VPN 相关标准的赛事信息。</p>}
-          </div>
-        </article>
-      </section>
     </div>
+  );
+}
+
+function SportsCalendarView({ events, evidence, summary }: { events: SportsEvent[]; evidence: Evidence[]; summary: string }) {
+  return (
+    <section className="bg-white px-5 py-5">
+      <SectionHeader
+        eyebrow="Sports Calendar"
+        title="赛事日历"
+        summary={summary}
+        right={<Badge className="border-teal-200 bg-teal-50 text-teal-700">按开始日期排序</Badge>}
+      />
+      <div className="mt-5 overflow-hidden rounded-md border border-zinc-200">
+        <div className="hidden grid-cols-[120px_1.1fr_1.15fr_1fr_96px] gap-3 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-semibold text-zinc-500 lg:grid">
+          <span>日期</span>
+          <span>赛事</span>
+          <span>平台</span>
+          <span>VPN 触发点</span>
+          <span>证据</span>
+        </div>
+        <div className="divide-y divide-zinc-100">
+          {events.map((event) => {
+            const date = formatCalendarDate(event.startDate);
+            const relatedEvidence = eventEvidence(event, evidence);
+            return (
+              <article key={`calendar-${event.id}`} className="grid gap-3 px-4 py-4 lg:grid-cols-[120px_1.1fr_1.15fr_1fr_96px] lg:items-start">
+                <div>
+                  <p className="text-base font-semibold text-zinc-950">{date.day}</p>
+                  <p className="mt-1 text-xs text-zinc-500">{date.weekday} · {eventStatus(event)}</p>
+                </div>
+                <div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge className={priorityStyles[event.priority]}>{event.priority}</Badge>
+                    <Badge className="border-zinc-200 bg-white text-zinc-600">{event.sport}</Badge>
+                  </div>
+                  <h3 className="mt-2 break-words text-sm font-semibold text-zinc-950">{event.event}</h3>
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">{formatDateRange(event.startDate, event.endDate)} · {event.stage}</p>
+                </div>
+                <div className="text-xs leading-5 text-zinc-600">
+                  <p><span className="font-semibold text-zinc-950">UK：</span>{event.ukPlatform}</p>
+                  <p className="mt-1"><span className="font-semibold text-zinc-950">US：</span>{event.usPlatform}</p>
+                  <p className="mt-1 text-zinc-500">关注市场：{eventMarketLabel(event)}</p>
+                </div>
+                <p className="text-xs leading-5 text-zinc-600">{event.restriction}</p>
+                <div className="flex flex-wrap gap-2 lg:block">
+                  <Badge className={relatedEvidence.length > 0 ? "border-teal-200 bg-teal-50 text-teal-700" : "border-zinc-200 bg-zinc-50 text-zinc-600"}>
+                    {relatedEvidence.length} 条
+                  </Badge>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SportsPlatformDirectory({ platforms, events }: { platforms: SportsMarketPlatform[]; events: SportsEvent[] }) {
+  return (
+    <article className="rounded-md border border-zinc-200 bg-white p-4">
+      <div className="flex flex-col gap-2 border-b border-zinc-200 pb-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-teal-700">Platform Directory</p>
+          <h3 className="mt-1 text-xl font-semibold text-zinc-950">赛事平台基础信息</h3>
+          <p className="mt-2 text-sm leading-6 text-zinc-600">只放平台、市场、访问方式和地区限制，和最新抓取信息分开维护。</p>
+        </div>
+        <Badge className="border-zinc-200 bg-zinc-50 text-zinc-600">{platforms.length} 个市场</Badge>
+      </div>
+      <div className="mt-4 grid gap-3">
+        {platforms.slice(0, 10).map((platform) => {
+          const relatedEvents = relatedEventsForPlatform(platform, events);
+          return (
+            <div key={`${platform.market}-${platform.platform}`} className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className={priorityStyles[platform.priority]}>{platform.priority}</Badge>
+                <span className="text-sm font-semibold text-zinc-950">{platform.market}</span>
+                <span className="text-sm text-zinc-600">{platform.platform}</span>
+              </div>
+              <div className="mt-3 grid gap-2 text-xs leading-5 text-zinc-600 md:grid-cols-2">
+                <p><span className="font-semibold text-zinc-950">访问方式：</span>{platform.access}</p>
+                <p><span className="font-semibold text-zinc-950">地区限制：</span>{platform.restriction}</p>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-zinc-500">
+                关联赛事：{relatedEvents.length > 0 ? relatedEvents.map((event) => event.event).join(" / ") : "待赛前匹配"}
+              </p>
+              {platform.url && (
+                <details className="mt-2 rounded border border-zinc-200 bg-white px-3 py-2">
+                  <summary className="cursor-pointer text-xs font-semibold text-teal-700">平台链接</summary>
+                  <a className="mt-2 block break-all text-xs leading-5 text-zinc-600 hover:text-zinc-950" href={platform.url} target="_blank" rel="noreferrer">
+                    {platform.url}
+                  </a>
+                </details>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </article>
+  );
+}
+
+function SportsLatestEvidence({ evidence }: { evidence: Evidence[] }) {
+  return (
+    <article className="rounded-md border border-zinc-200 bg-white p-4">
+      <div className="border-b border-zinc-200 pb-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-teal-700">Latest Signals</p>
+        <h3 className="mt-1 text-xl font-semibold text-zinc-950">最新 VPN 相关信息</h3>
+        <p className="mt-2 text-sm leading-6 text-zinc-600">这里只展示已经通过体育 + VPN/地区限制过滤的抓取结果。</p>
+      </div>
+      <div className="mt-4 grid gap-3">
+        {evidence.slice(0, 6).map((item) => (
+          <div key={item.id} className="border-b border-zinc-100 pb-3 last:border-0 last:pb-0">
+            <div className="flex flex-wrap gap-2">
+              <Badge className={item.role === "核心证据" ? "border-teal-200 bg-teal-50 text-teal-700" : "border-zinc-200 bg-zinc-50 text-zinc-600"}>{item.role}</Badge>
+              {item.vpnRelevance && <Badge className="border-cyan-200 bg-cyan-50 text-cyan-700">{item.vpnRelevance}</Badge>}
+            </div>
+            <p className="mt-2 text-sm font-semibold text-zinc-950">{item.title}</p>
+            <p className="mt-1 text-xs leading-5 text-zinc-500">{extractNeedText(item)}</p>
+            <SourceDisclosure item={item} />
+          </div>
+        ))}
+        {evidence.length === 0 && <p className="text-sm leading-6 text-zinc-600">今日暂未抓到符合 VPN 相关标准的赛事信息。</p>}
+      </div>
+    </article>
   );
 }
 
